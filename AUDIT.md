@@ -91,7 +91,7 @@
 
 23. **订阅输出丢失 Origin/Cookie/Authorization**
     - 已把这些 Header 继续传到 M3U 输出。
-    - 注意：公开订阅因此可能泄露敏感 Header，生产环境必须谨慎设置 `PUBLIC_PLAYLIST`。
+    - 注意：公开订阅因此可能泄露敏感 Header，设置 `PUBLIC_PLAYLIST` 时请留意。
 
 24. **历史保留配置只定义没有执行**
     - `HISTORY_RETENTION_DAYS` 原来没有实际清理逻辑。

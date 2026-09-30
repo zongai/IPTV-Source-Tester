@@ -1,6 +1,6 @@
 # IPTV Source Tester V4
 
-面向生产环境的 IPTV 源检测与订阅输出系统：导入 M3U/M3U8、异步连通性/HLS/分片/FFprobe 测试、百分制评分、定时任务、远程订阅自动拉取、合格源 M3U/JSON 订阅，以及 Web 管理界面。
+IPTV 源检测与订阅输出工具：导入 M3U/M3U8、异步连通性/HLS/分片/FFprobe 测试、百分制评分、定时任务、远程订阅自动拉取、合格源 M3U/JSON 订阅，以及 Web 管理界面。
 
 当前版本见仓库根目录 `VERSION` 文件。
 
@@ -228,7 +228,7 @@ PORTAINER.md
 
 1. 进行中的测试任务状态在进程内存中，**容器重启不会恢复进行中的任务**（已写入 SQLite 的结果仍在）  
 2. CLI `--duration` 未实现真正的长时稳定性循环  
-3. 若订阅含 Cookie/Authorization/Origin，导出时会写入播放所需 Header；公开订阅请谨慎  
+3. 若订阅含 Cookie/Authorization/Origin，导出时会写入播放所需 Header；开启公开订阅时请注意敏感 Header 可能被暴露  
 
 ---
 
