@@ -6,6 +6,7 @@ from app.core.config import get_settings
 from app.database.database import SessionLocal
 from app.database.locks import db_write_lock
 from app.database.models import SourceDB, TestResultDB, SchedulerConfigDB, SchedulerRunDB, RemotePlaylistDB
+from app.database.repository import maybe_auto_delete_failed_source, retain_ffprobe_media_fields
 from app.services.remote_playlist_service import fetch_remote_playlist
 from app.services.test_service import TestRunner
 
@@ -209,11 +210,17 @@ class SchedulerService:
             try:
                 async with db_write_lock:
                     with SessionLocal() as session:
+                        # Carry forward last FFprobe resolution when this mode cannot measure it.
+                        if isinstance(result, dict):
+                            result = retain_ffprobe_media_fields(session, src.id, result)
                         session.add(TestResultDB(source_id=src.id, tested_at=datetime.utcnow(),
                                                  **{k: result.get(k) for k in fields}))
                         src_db = session.get(SourceDB, src.id)
                         if src_db and result.get('segment_valid') is not None:
                             src_db.status = 'active' if result.get('segment_valid') else 'temporarily_failed'
+                        session.flush()
+                        if isinstance(result, dict) and result.get('segment_valid') is False:
+                            maybe_auto_delete_failed_source(session, src.id)
                         saved += 1
                         is_failed = result.get('segment_valid') is False
                         if is_failed:

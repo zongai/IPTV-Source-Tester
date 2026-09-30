@@ -10,6 +10,7 @@ from app.database.database import SessionLocal
 from app.database.init_db import init_db
 from app.database.locks import db_write_lock
 from app.database.models import ChannelDB, SourceDB, TestResultDB
+from app.database.repository import maybe_auto_delete_failed_source, retain_ffprobe_media_fields
 from app.exporters.m3u import render_m3u
 from app.parser.m3u import parse_m3u
 from app.services.import_service import import_entries
@@ -49,11 +50,16 @@ def test(deep: bool = False, duration: int = 0, channel: str = ''):
                           'error_type': 'INTERNAL_ERROR', 'error_message': str(result)[:1000]}
             async with db_write_lock:
                 with SessionLocal() as session:
+                    if isinstance(result, dict):
+                        result = retain_ffprobe_media_fields(session, src.id, result)
                     session.add(TestResultDB(source_id=src.id, tested_at=datetime.utcnow(),
                                              **{k: result.get(k) for k in fields}))
                     src_db = session.get(SourceDB, src.id)
                     if src_db and result.get('segment_valid') is not None:
                         src_db.status = 'active' if result.get('segment_valid') else 'temporarily_failed'
+                    session.flush()
+                    if isinstance(result, dict) and result.get('segment_valid') is False:
+                        maybe_auto_delete_failed_source(session, src.id)
                     session.commit()
         try:
             results = await runner.test_many(sources, deep=deep, mode='full' if deep else 'standard', on_result=save)

@@ -1,15 +1,55 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import Response, PlainTextResponse
+from fastapi.responses import JSONResponse, Response, PlainTextResponse
 from sqlalchemy import select, func
 
 from app.api.auth import require_playlist_access
 from app.database.database import SessionLocal
 from app.database.models import ChannelDB, SourceDB, TestResultDB
+from app.exporters.logo import resolve_tvg_logo
 from app.exporters.m3u import render_m3u
 from app.matcher.channel_matcher import channel_sort_key
 from app.core.config import get_settings
 
 router = APIRouter()
+
+
+def subscription_filename(
+    *,
+    ext: str,
+    min_score: float | None = None,
+    min_stability: float | None = None,
+    min_height: int = 0,
+    min_speed: float | None = None,
+) -> str:
+    """Build a descriptive download name for saved subscription files.
+
+    Example: iptv-s70-h720-20260930.m3u
+    """
+    settings = get_settings()
+    score = settings.min_score if min_score is None else min_score
+    stability = settings.min_stability if min_stability is None else min_stability
+    speed = 0 if min_speed is None else min_speed
+    parts = ["iptv", f"s{int(score) if float(score).is_integer() else score}"]
+    if min_height and min_height > 0:
+        parts.append(f"h{int(min_height)}")
+    if stability and float(stability) > 0 and float(stability) != float(settings.min_stability):
+        # only append when caller overrides default, keep names short otherwise
+        parts.append(f"st{int(float(stability) * 100)}")
+    if speed and float(speed) > 0:
+        parts.append(f"sp{int(speed) if float(speed).is_integer() else speed}")
+    parts.append(datetime.utcnow().strftime("%Y%m%d"))
+    name = "-".join(str(p) for p in parts)
+    ext = ext.lstrip(".")
+    return f"{name}.{ext}"
+
+
+def _content_disposition(filename: str) -> str:
+    # ASCII fallback + RFC 5987 filename* for players/browsers.
+    safe = filename.encode("ascii", "ignore").decode("ascii") or f"iptv.{filename.rsplit('.', 1)[-1]}"
+    from urllib.parse import quote
+    return f"attachment; filename=\"{safe}\"; filename*=UTF-8''{quote(filename)}"
 
 
 def _latest_validated_subquery():
@@ -48,7 +88,8 @@ def payload(min_score=0.0, min_stability=0.0, min_height=0, min_speed=0.0):
                 continue
             if (r.download_speed or 0) < min_speed:
                 continue
-            grouped.setdefault(c.id, {'id': c.id, 'name': c.display_name, 'logo': c.tvg_logo,
+            logo = resolve_tvg_logo(c.display_name or c.id, c.tvg_logo)
+            grouped.setdefault(c.id, {'id': c.id, 'name': c.display_name, 'logo': logo,
                                       'group': c.group_name, 'sources': []})['sources'].append({
                 'id': x.id, 'url': x.url, 'user_agent': x.user_agent, 'referer': x.referer,
                 'origin': x.origin, 'cookie': x.cookie, 'authorization': x.authorization, 'resolution': r.height, 'bitrate': r.bitrate,
@@ -72,18 +113,14 @@ def _query_filters(min_score=None, min_stability=None, min_height=0, min_speed=N
     )
 
 
-@router.get('/playlists/json', dependencies=[Depends(require_playlist_access)])
-def json_playlist(min_score: float | None = Query(None, ge=0, le=100), min_stability: float | None = Query(None, ge=0, le=1), min_height: int = Query(0, ge=0), min_speed: float | None = Query(None, ge=0)):
-    return _query_filters(min_score, min_stability, min_height, min_speed)
-
-
-@router.get('/player/channels', dependencies=[Depends(require_playlist_access)])
-def player_channels(min_score: float | None = Query(None, ge=0, le=100), min_stability: float | None = Query(None, ge=0, le=1), min_height: int = Query(0, ge=0), min_speed: float | None = Query(None, ge=0)):
-    return _query_filters(min_score, min_stability, min_height, min_speed)
-
-
-@router.get('/playlists/m3u', response_class=PlainTextResponse, dependencies=[Depends(require_playlist_access)])
-def m3u(min_score: float | None = Query(None, ge=0, le=100), min_stability: float | None = Query(None, ge=0, le=1), min_height: int = Query(0, ge=0), min_speed: float | None = Query(None, ge=0)):
+def _m3u_response(
+    min_score: float | None = None,
+    min_stability: float | None = None,
+    min_height: int = 0,
+    min_speed: float | None = None,
+    *,
+    download: bool = False,
+):
     data = _query_filters(min_score, min_stability, min_height, min_speed)
     entries = []
     for c in data['channels']:
@@ -102,15 +139,88 @@ def m3u(min_score: float | None = Query(None, ge=0, le=100), min_stability: floa
             entries.append({'name': c['name'], 'url': source['url'], 'attrs': {
                 'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'], 'group-title': c['group'] or '',
             }, 'headers': headers})
-    return Response(content=render_m3u(entries), media_type='audio/x-mpegurl',
-                    headers={'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0', 'Pragma': 'no-cache'})
+    resp_headers = {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+    }
+    if download:
+        filename = subscription_filename(
+            ext='m3u', min_score=min_score, min_stability=min_stability,
+            min_height=min_height, min_speed=min_speed,
+        )
+        resp_headers['Content-Disposition'] = _content_disposition(filename)
+    return Response(content=render_m3u(entries), media_type='audio/x-mpegurl', headers=resp_headers)
+
+
+def _json_response(
+    min_score: float | None = None,
+    min_stability: float | None = None,
+    min_height: int = 0,
+    min_speed: float | None = None,
+    *,
+    download: bool = False,
+):
+    data = _query_filters(min_score, min_stability, min_height, min_speed)
+    if not download:
+        return data
+    filename = subscription_filename(
+        ext='json', min_score=min_score, min_stability=min_stability,
+        min_height=min_height, min_speed=min_speed,
+    )
+    return JSONResponse(
+        content=data,
+        headers={
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Content-Disposition': _content_disposition(filename),
+        },
+    )
+
+
+@router.get('/playlists/json', dependencies=[Depends(require_playlist_access)])
+def json_playlist(
+    min_score: float | None = Query(None, ge=0, le=100),
+    min_stability: float | None = Query(None, ge=0, le=1),
+    min_height: int = Query(0, ge=0),
+    min_speed: float | None = Query(None, ge=0),
+    download: bool = Query(False),
+):
+    return _json_response(min_score, min_stability, min_height, min_speed, download=download)
+
+
+@router.get('/player/channels', dependencies=[Depends(require_playlist_access)])
+def player_channels(min_score: float | None = Query(None, ge=0, le=100), min_stability: float | None = Query(None, ge=0, le=1), min_height: int = Query(0, ge=0), min_speed: float | None = Query(None, ge=0)):
+    return _query_filters(min_score, min_stability, min_height, min_speed)
+
+
+@router.get('/playlists/m3u', response_class=PlainTextResponse, dependencies=[Depends(require_playlist_access)])
+def m3u(
+    min_score: float | None = Query(None, ge=0, le=100),
+    min_stability: float | None = Query(None, ge=0, le=1),
+    min_height: int = Query(0, ge=0),
+    min_speed: float | None = Query(None, ge=0),
+    download: bool = Query(False),
+):
+    return _m3u_response(min_score, min_stability, min_height, min_speed, download=download)
 
 
 @router.get('/subscription/m3u', response_class=PlainTextResponse, dependencies=[Depends(require_playlist_access)])
-def subscription_m3u(min_score: float | None = Query(None, ge=0, le=100), min_stability: float | None = Query(None, ge=0, le=1), min_height: int = Query(0, ge=0), min_speed: float | None = Query(None, ge=0)):
-    return m3u(min_score, min_stability, min_height, min_speed)
+def subscription_m3u(
+    min_score: float | None = Query(None, ge=0, le=100),
+    min_stability: float | None = Query(None, ge=0, le=1),
+    min_height: int = Query(0, ge=0),
+    min_speed: float | None = Query(None, ge=0),
+    download: bool = Query(False),
+):
+    return _m3u_response(min_score, min_stability, min_height, min_speed, download=download)
 
 
 @router.get('/subscription/json', dependencies=[Depends(require_playlist_access)])
-def subscription_json(min_score: float | None = Query(None, ge=0, le=100), min_stability: float | None = Query(None, ge=0, le=1), min_height: int = Query(0, ge=0), min_speed: float | None = Query(None, ge=0)):
-    return _query_filters(min_score, min_stability, min_height, min_speed)
+def subscription_json(
+    min_score: float | None = Query(None, ge=0, le=100),
+    min_stability: float | None = Query(None, ge=0, le=1),
+    min_height: int = Query(0, ge=0),
+    min_speed: float | None = Query(None, ge=0),
+    download: bool = Query(False),
+):
+    return _json_response(min_score, min_stability, min_height, min_speed, download=download)

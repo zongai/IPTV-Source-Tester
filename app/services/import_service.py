@@ -2,6 +2,7 @@ import json
 from urllib.parse import urlsplit
 from sqlalchemy import select, delete
 from app.database.models import ChannelDB, SourceDB
+from app.exporters.logo import is_broken_logo, resolve_tvg_logo
 from app.matcher.channel_matcher import channel_id_for
 from app.parser.normalizer import normalize_url
 
@@ -20,6 +21,9 @@ def import_entries(session, entries, playlist_name=None):
             continue
 
         cid = channel_id_for(tvg_id=e.tvg_id, tvg_name=e.tvg_name, display_name=e.name)
+        display = e.name or e.tvg_name
+        # Fix empty/broken tvg-logo (e.g. .../icon/.png) via vircloud/TVLogo.
+        logo = resolve_tvg_logo(display or cid, e.tvg_logo)
         c = session.get(ChannelDB, cid)
         if not c:
             c = ChannelDB(
@@ -28,9 +32,9 @@ def import_entries(session, entries, playlist_name=None):
                 # The display name is the authoritative playlist channel name.
                 # tvg-id is intentionally stored as metadata only because it is
                 # frequently reused across unrelated channels.
-                display_name=e.name or e.tvg_name,
+                display_name=display,
                 tvg_id=e.tvg_id,
-                tvg_logo=e.tvg_logo,
+                tvg_logo=logo,
                 group_name=e.group,
                 language=e.tvg_language,
                 country=e.tvg_country,
@@ -40,11 +44,12 @@ def import_entries(session, entries, playlist_name=None):
             session.flush()
         else:
             if e.tvg_name or e.name:
-                c.display_name = e.name or e.tvg_name
+                c.display_name = display
             if e.tvg_id:
                 c.tvg_id = e.tvg_id
-            if e.tvg_logo:
-                c.tvg_logo = e.tvg_logo
+            if logo and (not c.tvg_logo or is_broken_logo(c.tvg_logo) or e.tvg_logo):
+                # Always refresh when incoming logo is good, or existing one is broken.
+                c.tvg_logo = logo
             if e.group:
                 c.group_name = e.group
             if e.tvg_language:

@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     max_playlist_bytes: int = Field(2 * 1024 * 1024, ge=65536, le=20 * 1024 * 1024)
     max_segment_bytes: int = Field(32 * 1024 * 1024, ge=1024 * 1024, le=256 * 1024 * 1024)
     remote_playlist_max_failures: int = Field(3, ge=1, le=20)
+    # Auto-delete a source only when BOTH conditions hold after a failed test:
+    # consecutive validated failures >= source_auto_delete_failures
+    # AND the failure streak has lasted at least source_auto_delete_days days.
+    source_auto_delete_failures: int = Field(5, ge=1, le=100)
+    source_auto_delete_days: int = Field(5, ge=1, le=365)
 
 @lru_cache
 def get_settings() -> Settings:

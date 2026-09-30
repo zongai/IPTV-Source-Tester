@@ -27,6 +27,8 @@ services:
       NETWORK_RETRIES: ${NETWORK_RETRIES:-1}
       MAX_PLAYLIST_BYTES: ${MAX_PLAYLIST_BYTES:-2097152}
       MAX_SEGMENT_BYTES: ${MAX_SEGMENT_BYTES:-33554432}
+      SOURCE_AUTO_DELETE_FAILURES: ${SOURCE_AUTO_DELETE_FAILURES:-5}
+      SOURCE_AUTO_DELETE_DAYS: ${SOURCE_AUTO_DELETE_DAYS:-5}
     volumes:
       # Host project path is the single source of truth for code/UI.
       # Edit files here, restart the container if Python code changed; no image rebuild.

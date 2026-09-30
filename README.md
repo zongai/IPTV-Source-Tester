@@ -130,9 +130,18 @@ API：
 ## 当前仍需注意的限制
 
 1. 活动测试任务状态目前保存在进程内存；容器重启后不会恢复正在执行的任务，只会保留已经提交到 SQLite 的历史结果。
-2. `SourcePool`、持续 Stability 测试和自动连续失败删除尚未完全接入 Web 测试主流程；不能把现有 `source_pool.py` 视为已经启用的自动删除机制。
+2. 持续 Stability 测试尚未完全接入 Web 测试主流程；内存版 `source_pool.py` 不是删除依据。
 3. CLI 的 `--duration` 仍未实现真正的持续稳定性测试。
 4. 公开订阅如果包含 Cookie/Authorization/Origin，会把这些播放所需 Header 一并输出；生产环境不要把带敏感 Header 的订阅设置为公开。
+
+### 源（Source）长期失败自动删除
+
+每次 **Standard / Full** 测试写入失败结果后检查（Quick 的 `segment_valid` 为空，不计入）：
+
+1. 最近连续失败次数 ≥ `SOURCE_AUTO_DELETE_FAILURES`（默认 **5**）
+2. **并且** 该连续失败跨度 ≥ `SOURCE_AUTO_DELETE_DAYS` 天（默认 **5**）
+
+两条件同时满足才删除该源及其测试历史；若频道下已无其它源，一并删除空频道。成功一次测试会打断连续失败计数。
 
 ### 远程 M3U 失效自动删除
 

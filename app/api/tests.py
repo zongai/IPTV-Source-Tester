@@ -10,6 +10,7 @@ from app.api.websocket import broadcast
 from app.database.database import SessionLocal
 from app.database.locks import db_write_lock
 from app.database.models import SourceDB, TestResultDB
+from app.database.repository import maybe_auto_delete_failed_source, retain_ffprobe_media_fields
 from app.services.test_service import TestRunner
 
 router = APIRouter()
@@ -50,11 +51,17 @@ async def run_job(job_id, deep=True, source_ids=None, mode=None):
             async with db_write_lock:
                 write_session = SessionLocal()
                 try:
+                    # Carry forward last FFprobe resolution when this mode cannot measure it.
+                    result = retain_ffprobe_media_fields(write_session, source.id, result)
                     data = {k: result.get(k) for k in _RESULT_FIELDS}
                     write_session.add(TestResultDB(source_id=source.id, tested_at=datetime.utcnow(), **data))
                     src_db = write_session.get(SourceDB, source.id)
                     if src_db and result.get('segment_valid') is not None:
                         src_db.status = 'active' if result.get('segment_valid') else 'temporarily_failed'
+                    # Persist the failure row first so consecutive-failure counting includes it.
+                    write_session.flush()
+                    if result.get('segment_valid') is False:
+                        maybe_auto_delete_failed_source(write_session, source.id)
                     write_session.commit()
                 except Exception as exc:
                     write_session.rollback()
