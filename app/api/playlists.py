@@ -89,17 +89,30 @@ def payload(min_score=0.0, min_stability=0.0, min_height=0, min_speed=0.0):
             if (r.download_speed or 0) < min_speed:
                 continue
             logo = resolve_tvg_logo(c.display_name or c.id, c.tvg_logo)
-            grouped.setdefault(c.id, {'id': c.id, 'name': c.display_name, 'logo': logo,
-                                      'group': c.group_name, 'sources': []})['sources'].append({
-                'id': x.id, 'url': x.url, 'user_agent': x.user_agent, 'referer': x.referer,
-                'origin': x.origin, 'cookie': x.cookie, 'authorization': x.authorization, 'resolution': r.height, 'bitrate': r.bitrate,
+            # Prefer the source's own group-title; fall back to channel group.
+            src_group = (getattr(x, 'group_name', None) or c.group_name or '') or None
+            bucket = grouped.setdefault(c.id, {
+                'id': c.id, 'name': c.display_name, 'logo': logo,
+                'group': c.group_name, 'sources': [],
+            })
+            bucket['sources'].append({
+                'id': x.id, 'url': x.url,
+                'group': src_group,
+                'user_agent': x.user_agent, 'referer': x.referer,
+                'origin': x.origin, 'cookie': x.cookie, 'authorization': x.authorization,
+                'resolution': r.height, 'bitrate': r.bitrate,
                 'score': r.score, 'stability': r.stability, 'speed': r.download_speed,
-                'latency': r.ttfb * 1000 if r.ttfb else None, 'tested_at': r.tested_at.isoformat(),
+                'latency': r.ttfb * 1000 if r.ttfb else None,
+                'tested_at': r.tested_at.isoformat() if r.tested_at else None,
             })
         out = list(grouped.values())
         out.sort(key=lambda c: channel_sort_key(c['name']))
         for c in out:
             c['sources'].sort(key=lambda z: (z['score'] or 0, z['stability'] or 0, z['speed'] or 0), reverse=True)
+            # Channel-level group: most common non-empty source group, else stored channel group.
+            groups = [s.get('group') for s in c['sources'] if s.get('group')]
+            if groups:
+                c['group'] = max(set(groups), key=groups.count)
         return {'channels': out, 'channel_count': len(out), 'source_count': sum(len(c['sources']) for c in out)}
 
 
@@ -136,9 +149,17 @@ def _m3u_response(
                 headers['Cookie'] = source['cookie']
             if source.get('authorization'):
                 headers['Authorization'] = source['authorization']
+            # Per-source group-title so the same channel under different lists stays correct.
+            group_title = source.get('group') or c.get('group') or ''
             entries.append({'name': c['name'], 'url': source['url'], 'attrs': {
-                'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'], 'group-title': c['group'] or '',
+                'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'],
+                'group-title': group_title,
             }, 'headers': headers})
+    # Group then channel name — players show folders by group-title order of first appearance.
+    entries.sort(key=lambda e: (
+        (e.get('attrs') or {}).get('group-title') or '',
+        e.get('name') or '',
+    ))
     resp_headers = {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
         'Pragma': 'no-cache',

@@ -93,7 +93,7 @@ button:hover{filter:brightness(1.05)}
       <h1>IPTV Source Tester V4</h1>
       <div class="sub">导入源 · 自动检测 · 生成订阅</div>
     </div>
-    <div class="muted">版本 <span id="appVersion" class="version-badge">加载中…</span></div>
+    <div class="muted">版本 <span id="appVersion" class="version-badge">…</span></div>
   </header>
 
   <section class="section">
@@ -518,6 +518,91 @@ async function loadChannels(force = false) {
     document.getElementById('channels').textContent = '结果加载失败：' + e.message;
   } finally {
     _chLoading = false;
+  }
+}
+
+
+function subscriptionFileName(ext, score, height) {
+  const d = new Date();
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const s = Number(score);
+  const sPart = Number.isInteger(s) ? String(s) : String(score);
+  let parts = ['iptv', 's' + sPart];
+  if (Number(height) > 0) parts.push('h' + Number(height));
+  parts.push('' + y + mo + day);
+  return parts.join('-') + '.' + ext;
+}
+
+async function updateSubs() {
+  const scoreEl = document.getElementById('minScore');
+  const heightEl = document.getElementById('minHeight');
+  const subsEl = document.getElementById('subs');
+  if (!subsEl) return;
+  let score = scoreEl ? (scoreEl.value || 0) : 0;
+  let h = heightEl ? (heightEl.value || 0) : 0;
+  const q = `min_score=${encodeURIComponent(score)}&min_height=${encodeURIComponent(h)}`;
+  let m = `${base}/api/subscription/m3u?${q}`;
+  let j = `${base}/api/subscription/json?${q}`;
+  let mDl = `${m}&download=1`, jDl = `${j}&download=1`;
+  const mName = subscriptionFileName('m3u', score, h);
+  const jName = subscriptionFileName('json', score, h);
+  let count = '正在统计合格源…';
+  try {
+    let d = await req(j, { cache: 'no-store' });
+    count = `当前合格：${d.channel_count || 0} 个频道，${d.source_count || 0} 个源`;
+  } catch (e) {
+    count = '订阅统计读取失败：' + e.message;
+  }
+  subsEl.innerHTML = `
+    <div class="sub ok"><b>${count}</b></div>
+    <div class="sub"><b>M3U 订阅地址：</b><a href="${m}" target="_blank">${m}</a></div>
+    <div class="sub"><b>JSON 订阅地址：</b><a href="${j}" target="_blank">${j}</a></div>
+    <div class="sub row" style="gap:8px;margin-top:6px">
+      <a class="sub" style="padding:0" href="${mDl}" download="${mName}">
+        <button type="button">保存 M3U（${mName}）</button>
+      </a>
+      <a class="sub" style="padding:0" href="${jDl}" download="${jName}">
+        <button type="button" class="secondary">保存 JSON（${jName}）</button>
+      </a>
+    </div>`;
+}
+
+async function loadRemotePlaylists() {
+  const box = document.getElementById('remotePlaylists');
+  if (!box) return;
+  try {
+    let d = await req('/api/remote-playlists');
+    if (!Array.isArray(d) || !d.length) {
+      box.innerHTML = '<span class="muted">暂无远程订阅，可在上方添加</span>';
+      return;
+    }
+    let rows = d.map(x => {
+      let fail = x.consecutive_failures || 0;
+      let status = labelMap(REMOTE_STATUS, x.last_status, x.last_status || '未知');
+      if (x.last_status === 'failed' && fail)
+        status += `（连续失败 ${fail}/${x.auto_delete_after_failures || 3}）`;
+      return `<tr>
+        <td>${escapeHtml(x.name)}</td>
+        <td style="word-break:break-all">${escapeHtml(x.url)}</td>
+        <td>${x.enabled ? '启用' : '停用'}</td>
+        <td>${x.interval_minutes} 分钟</td>
+        <td>${x.last_fetched_at ? fmtTime(x.last_fetched_at) : '从未获取'}</td>
+        <td>${escapeHtml(status)}${x.last_error ? '：' + escapeHtml(x.last_error) : ''}</td>
+        <td>新增 ${x.last_added || 0} / 跳过 ${x.last_skipped || 0}</td>
+        <td>
+          <button onclick="fetchRemote(${x.id})">立即获取</button>
+          <button class="secondary" onclick="toggleRemote(${x.id}, ${!x.enabled})">${x.enabled ? '停用' : '启用'}</button>
+          <button class="secondary" onclick="deleteRemote(${x.id})">删除</button>
+        </td>
+      </tr>`;
+    }).join('');
+    box.innerHTML = `<div class="result-table-wrap"><table class="result-table" style="min-width:900px"><thead><tr>
+      <th>名称</th><th>地址</th><th>开关</th><th>间隔</th><th>上次获取</th><th>结果</th><th>导入统计</th><th>操作</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+  } catch (e) {
+    box.textContent = '远程订阅加载失败：' + e.message;
   }
 }
 

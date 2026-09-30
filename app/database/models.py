@@ -25,6 +25,8 @@ class SourceDB(Base):
     url: Mapped[str] = mapped_column(Text)
     normalized_url: Mapped[str] = mapped_column(Text, index=True)
     source_playlist: Mapped[str | None] = mapped_column(Text)
+    # Per-source group from M3U group-title (channel.group_name is only a fallback).
+    group_name: Mapped[str | None] = mapped_column(String(255))
     user_agent: Mapped[str | None] = mapped_column(Text)
     referer: Mapped[str | None] = mapped_column(Text)
     origin: Mapped[str | None] = mapped_column(Text)

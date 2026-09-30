@@ -85,8 +85,10 @@ def export(format: str = 'm3u', output: str = ''):
         for c in data['channels']:
             for source in c['sources']:
                 headers = {k: source[k] for k in ('user_agent','referer','origin','cookie','authorization') if source.get(k)}
+                group_title = source.get('group') or c.get('group') or ''
                 entries.append({'name': c['name'], 'url': source['url'], 'attrs': {
-                    'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'], 'group-title': c['group'] or ''
+                    'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'],
+                    'group-title': group_title,
                 }, 'headers': headers})
         content = render_m3u(entries)
     else:
