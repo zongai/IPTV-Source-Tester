@@ -1,0 +1,49 @@
+services:
+  iptv-tester:
+    # Build this image only when the runtime environment changes
+    # (Python/OS/FFmpeg/dependencies). Application code and frontend are
+    # bind-mounted below, so normal code/UI changes do not require a rebuild.
+    image: iptv-source-tester:v4
+    container_name: iptv-source-tester
+    restart: unless-stopped
+    init: true
+    ports:
+      - "7777:8000"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      DATABASE_URL: sqlite:////data/iptv.db
+      MAX_CONCURRENCY: ${MAX_CONCURRENCY:-100}
+      MAX_HOST_CONCURRENCY: ${MAX_HOST_CONCURRENCY:-5}
+      CONNECT_TIMEOUT: ${CONNECT_TIMEOUT:-5}
+      READ_TIMEOUT: ${READ_TIMEOUT:-10}
+      FFPROBE_TIMEOUT: ${FFPROBE_TIMEOUT:-15}
+      SEGMENT_TEST_COUNT: ${SEGMENT_TEST_COUNT:-3}
+      TEST_INTERVAL_MINUTES: ${TEST_INTERVAL_MINUTES:-30}
+      MIN_SCORE: ${MIN_SCORE:-70}
+      MIN_STABILITY: ${MIN_STABILITY:-0.90}
+      API_TOKEN: ${API_TOKEN:-}
+      PUBLIC_PLAYLIST: ${PUBLIC_PLAYLIST:-false}
+      HISTORY_RETENTION_DAYS: ${HISTORY_RETENTION_DAYS:-30}
+      NETWORK_RETRIES: ${NETWORK_RETRIES:-1}
+      MAX_PLAYLIST_BYTES: ${MAX_PLAYLIST_BYTES:-2097152}
+      MAX_SEGMENT_BYTES: ${MAX_SEGMENT_BYTES:-33554432}
+    volumes:
+      # Host project path is the single source of truth for code/UI.
+      # Edit files here, restart the container if Python code changed; no image rebuild.
+      - /volume2/Data/iptv-tester/app:/app/app:ro
+      - /volume2/Data/iptv-tester/frontend:/app/frontend:ro
+      - /volume2/Data/iptv-tester/migrations:/app/migrations:ro
+      - /volume2/Data/iptv-tester/VERSION:/app/VERSION:ro
+      - /volume2/Data/iptv-tester/data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
