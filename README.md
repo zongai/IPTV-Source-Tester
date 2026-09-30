@@ -1,155 +1,249 @@
 # IPTV Source Tester V4
 
-Production-oriented IPTV source pool foundation implementing asynchronous connectivity/HLS/segment testing, bounded FFprobe, scoring, source pooling/failover selection, historical results, FastAPI/JSON/M3U APIs, WebSocket endpoint, CLI, SQLite/SQLAlchemy and Docker/FFmpeg packaging.
+面向生产环境的 IPTV 源检测与订阅输出系统：导入 M3U/M3U8、异步连通性/HLS/分片/FFprobe 测试、百分制评分、定时任务、远程订阅自动拉取、合格源 M3U/JSON 订阅，以及 Web 管理界面。
 
-## Run
+当前版本见仓库根目录 `VERSION` 文件。
+
+---
+
+## 功能概览
+
+| 模块 | 说明 |
+|------|------|
+| **导入** | 本地上传或 HTTP(S) 远程 M3U/M3U8；按 URL+请求头去重；启动时清理历史重复源 |
+| **远程订阅** | 按间隔自动拉取并导入；永久失效立即删配置，临时错误连续失败后删配置 |
+| **测试模式** | 快速（仅连接）/ 标准（HLS+分片）/ 完整（含 FFprobe） |
+| **评分** | 可用性、稳定性、延迟、速度、分辨率、启动时间，满分 100 |
+| **分辨率** | 仅 FFprobe 写入；Quick/Standard 不覆盖已有分辨率 |
+| **源清理** | 连续验证失败 ≥ N 次 **且** 失败跨度 ≥ M 天时自动删除源（默认 5/5） |
+| **订阅** | 仅输出最近一次验证通过且满足筛选条件的源；支持下载命名 |
+| **Logo** | 无效 `tvg-logo` 自动映射到 [vircloud/TVLogo](https://github.com/vircloud/TVLogo) |
+| **Web** | 统计、导入、远程订阅、手动/定时测试、结果表（分页/搜索）、网络诊断（默认折叠） |
+| **CLI** | 导入、测试、导出、统计 |
+
+---
+
+## 快速开始（本地）
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 pytest -q
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Set `API_TOKEN` for management endpoints. Set `PUBLIC_PLAYLIST=true` to expose player playlist endpoints. Never log Cookie/Authorization values.
+浏览器打开：`http://127.0.0.1:8000/`
 
-### Docker / Portainer
+- 管理接口：设置环境变量 `API_TOKEN` 后使用 `Authorization: Bearer <token>`
+- 公开订阅：`PUBLIC_PLAYLIST=true` 时，订阅/播放列表接口可不带 Token
+- **不要**在日志中输出 Cookie / Authorization 明文
 
-固定运行环境镜像 + 宿主机挂载 `app/`、`frontend/`（见 `PORTAINER.md`、`docker-compose.portainer.yml`）：
+### CLI
 
-- **代码 / 界面变更**：重启容器或刷新页面即可，**不必**重建镜像
-- **运行环境变更**（`Dockerfile`、`requirements.txt`、Python、FFmpeg、系统依赖）：**需要重新构建镜像**
+```bash
+iptv import playlist.m3u
+iptv test --deep --channel cctv-1
+iptv export --format m3u --output output.m3u
+iptv stats
+```
 
-## CLI
+说明：`--duration` 仅保留兼容，**不会**启动持续稳定性循环。
 
-`iptv import playlist.m3u`
+---
 
-`iptv test --deep --channel cctv-1`
+## Docker / Portainer 部署
 
-`iptv export --format m3u --output output.m3u`
+推荐：**固定运行环境镜像 + 宿主机挂载代码**。详见 [`PORTAINER.md`](PORTAINER.md) 与 `docker-compose.portainer.yml`。
 
-`--duration` 当前只保留兼容参数，不会启动持续稳定性循环。
+| 变更内容 | 操作 |
+|----------|------|
+| `app/`、`frontend/`、`migrations/`、`VERSION` | **不必**重建镜像；Python 改完**重启容器**，前端一般**刷新页面** |
+| `Dockerfile`、`requirements.txt`、Python、FFmpeg、系统包 | **必须重新构建镜像** |
 
-`iptv stats`
+```bash
+# 仅首次或运行环境变更时
+cd /path/to/iptv-tester
+docker build -t iptv-source-tester:v4 .
+# 再在 Portainer 中用 docker-compose.portainer.yml 部署 Stack
+```
 
-## Web 导入与测试结果订阅
+默认映射示例：`http://<服务器>:7777/` → 容器 `8000`。
 
-打开 `http://<服务器>:8000/`（Portainer 示例端口为 `7777`）即可：
+数据目录建议持久化到宿主机（compose 中 `/data` → SQLite）。
 
-1. 上传 `.m3u` / `.m3u8` 文件；
-2. 输入 HTTP/HTTPS M3U/M3U8 地址导入；
-3. 查看导入数量和重复数量；
-4. 点击“开始测试全部源”；
-5. 查看每个源的通过状态、分辨率、评分、速度和错误类型；
-6. 页面直接生成测试结果订阅地址。
+---
 
-订阅接口：
+## Web 使用流程
 
-- `GET /api/subscription/m3u`：仅输出最近一次测试通过并达到默认评分 70 的源；
-- `GET /api/subscription/json`：同样的结果，以 JSON 返回；
-- `GET /api/playlists/m3u`：可自定义 `min_score`、`min_stability`、`min_height`、`min_speed`；
-- `GET /api/playlists/json`：JSON 版本；
-- `GET /api/player/channels`：播放器结构化频道接口。
+1. **导入**：上传 `.m3u` / `.m3u8` / `.txt`，或填写远程 HTTP(S) 地址  
+2. **远程自动获取**（可选）：添加订阅名称、URL、间隔分钟数  
+3. **手动测试**：选择快速/标准/完整，开始测试全部源；进度条与结果表实时更新  
+4. **定时测试**：启用、设间隔与范围（全部启用 / 仅失败 / 超时未测），可立即执行  
+5. **订阅**：设置最低评分、最低分辨率，复制 M3U/JSON 地址，或「保存」下载（自动文件名）  
+6. **网络诊断**（辅助工具，默认折叠）：容器内 DNS → TCP → TLS → HTTP  
 
-示例：
+### 订阅地址示例
 
 ```text
 http://<服务器>:7777/api/subscription/m3u?min_score=70&min_height=720
+http://<服务器>:7777/api/subscription/json?min_score=70&min_height=720
+# 下载时加 download=1，会带 Content-Disposition 文件名，例如：
+# iptv-s70-h720-20260930.m3u
 ```
 
-当 `API_TOKEN` 为空时，上述接口无需 Token；设置 `API_TOKEN` 后则按 Bearer Token 鉴权。
+订阅内容为：**最近一次已验证**（`segment_valid` 非空）且 **通过**、满足 `min_score` / `min_height` 等条件、源为启用且非失败状态的条目。测试进行中也可边测边订。
 
-## Web 定时任务
+---
 
-首页提供定时测试管理：
+## 测试模式说明
 
-- 启用/停用自动测试
-- 间隔 1~10080 分钟
-- 快速/标准/完整（FFprobe）模式
-- 所有启用源 / 仅失败源 / 超时未测试源
-- 设置持久化到 SQLite，重启容器自动恢复
-- Web 立即执行
-- 显示上次执行、测试数量、失败数量、下次执行时间
+| 模式 | 行为 | `segment_valid` |
+|------|------|-----------------|
+| **快速** | 仅 HTTP 连通性 | 保持未设置（不参与「已验证」订阅筛选） |
+| **标准** | 连通 + HLS 列表 + 分片下载测速 | 通过/失败 |
+| **完整** | 标准 + FFprobe（编码/分辨率等） | FFprobe 失败则记为失败 |
 
-API：
+分辨率、编码等媒体字段：**仅 FFprobe 成功时更新**；之后的 Quick/Standard 结果会沿用上次 FFprobe 的分辨率，避免被清空。
 
-- `GET /api/scheduler`
-- `PUT /api/scheduler`
-- `POST /api/scheduler/run`
+### 评分（满分 100）
 
-当 `API_TOKEN` 未设置或为空时，上述接口无需 Token；设置 Token 后使用 Bearer Token。
+- 可用性 30 + 稳定性 25 + 延迟 15 + 速度 15 + 分辨率 10 + 启动时间 5  
+- 延迟按 TTFB；速度按平均分片 Mbps；分辨率按高度档位给分  
 
-## 测试速度优化
+页面「数值说明」有完整档位与颜色含义。
 
-测试器现在采用 asyncio 有界并发和共享 HTTP Session。Web 定时任务可以设置：
+---
 
-- 全局并发：默认 20
-- 单 Host 并发：默认 5
-- 连接超时：默认 5 秒
-- 读取超时：默认 10 秒
-- HLS 分片测试数量：默认 3
+## 自动清理策略
 
-测试模式已经分级：
+### 源（Source）
 
-- Quick：仅 DNS/HTTP/响应检测，适合快速筛选
-- Standard：HTTP + HLS + 分片
-- Full：Standard + FFprobe
+同时满足时删除该源及其测试历史（频道下无源则删空频道）：
 
-建议 Synology 从全局并发 20 开始，确认 CPU、网络和上游响应稳定后再逐步提高。
+1. 连续 **Standard/Full** 验证失败次数 ≥ `SOURCE_AUTO_DELETE_FAILURES`（默认 **5**）  
+2. 该失败跨度 ≥ `SOURCE_AUTO_DELETE_DAYS` 天（默认 **5**）  
 
-## 远程 M3U 定时获取
+一次成功会打断连续失败计数。Quick 不计入。
 
-Web 管理界面支持维护多个远程 M3U/M3U8 订阅，每个订阅可单独设置获取间隔（1 分钟～7 天）。系统会在 APScheduler 中为每个远程订阅建立独立任务，定时下载并导入；重复 URL 不会重复创建 Source。
+### 远程 M3U 配置
 
-API：
+- HTTP 400/401/403/404/410/422、空列表、无效内容 → **立即删除**该远程配置  
+- 超时、连接失败、5xx 等 → 连续失败 ≥ `REMOTE_PLAYLIST_MAX_FAILURES`（默认 **3**）后删除  
+- **只删远程订阅配置与对应定时任务，不删已导入的频道和源**
 
-- `GET /api/remote-playlists`
-- `POST /api/remote-playlists`
-- `PUT /api/remote-playlists/{id}`
-- `DELETE /api/remote-playlists/{id}`
-- `POST /api/remote-playlists/{id}/fetch`
+---
 
-导入阶段会忽略频道名称/tvg-id/tvg-name 为 `更新日期` 的条目。
+## 环境变量
 
-## 本次修复说明（网络诊断 / 实时订阅 / M3U 频道归并）
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `DATABASE_URL` | `sqlite:///./data/iptv.db` | 数据库；容器内常用 `sqlite:////data/iptv.db` |
+| `MAX_CONCURRENCY` | `100` | 全局测试并发 |
+| `MAX_HOST_CONCURRENCY` | `5` | 单 Host 并发 |
+| `CONNECT_TIMEOUT` / `READ_TIMEOUT` | `5` / `10` | 连接/读超时（秒） |
+| `FFPROBE_TIMEOUT` | `15` | FFprobe 超时（秒） |
+| `SEGMENT_TEST_COUNT` | `3` | 标准/完整模式测速分片数 |
+| `TEST_INTERVAL_MINUTES` | `30` | 默认定时间隔 |
+| `MIN_SCORE` / `MIN_STABILITY` | `70` / `0.90` | 订阅默认门槛 |
+| `API_TOKEN` | 空 | 管理接口鉴权；空则管理接口不校验 |
+| `PUBLIC_PLAYLIST` | `false` | `true` 时订阅接口可不带 Token |
+| `HISTORY_RETENTION_DAYS` | `30` | 测试历史保留天数（启动 + 每日清理） |
+| `NETWORK_RETRIES` | `1` | 网络重试次数 |
+| `MAX_PLAYLIST_BYTES` | `2097152` | HLS 播放列表读取上限 |
+| `MAX_SEGMENT_BYTES` | `33554432` | 单分片读取上限 |
+| `REMOTE_PLAYLIST_MAX_FAILURES` | `3` | 远程订阅临时失败删除阈值 |
+| `SOURCE_AUTO_DELETE_FAILURES` | `5` | 源连续失败删除阈值 |
+| `SOURCE_AUTO_DELETE_DAYS` | `5` | 源失败跨度天数阈值 |
 
-- M3U/M3U8 导入自动清理 UTF-8 BOM，避免第一频道出现隐藏字符。
-- 修正频道归并：未知中文/Unicode 频道不再全部归入 `unknown`，每个频道保持独立 ID。
-- 重新导入相同 URL 时，如果历史数据库中的源属于错误频道，会自动修正频道归属；空频道自动清理。
-- Standard（HLS+分片）测试在分片通过后立即计算评分、可用率和失败率，不需要等待 FFprobe。
-- 订阅接口只读取最近一次已经完成 HLS/分片验证的结果，因此 Quick 测试不会覆盖已有合格结果；后续 Standard/Full 失败会正常使源退出订阅。
-- M3U 订阅响应增加 `no-store`，避免浏览器/播放器缓存旧的空订阅。
-- Web 测试过程中每 1.5 秒刷新测试结果和订阅统计，因此已有合格源会在测试尚未完成时立即出现在订阅中。
-- `/api/network/check` 从 Tester 容器内部执行 DNS → TCP → TLS → HTTP 诊断，用于区分容器网络问题和 IPTV 源自身问题。
+完整示例见 `.env.example`。
 
+---
 
-## 代码审查后的重要行为
+## 主要 HTTP API
 
-- Standard 测试完成 HLS + 指定数量分片后即可产生评分和订阅结果，不需要等待 FFprobe。
-- Full 模式只有 FFprobe 成功才保留最终通过状态。
-- 网络诊断区分 `network_ok` 与 `http_ok`：HTTP 403/404 说明服务器可达但业务请求被拒绝，不再误判为 NAS/Docker 网络故障。
-- HLS Segment 记录具体 HTTP/TLS/DNS/TIMEOUT/EMPTY/HTML 等错误，并限制 Playlist/Segment 内存读取上限。
-- SQLite 写入统一串行化；手动测试停止会真正取消任务。
-- 测试结果页面刷新后会尝试恢复当前进程中的活动任务轮询。
-- TestResult 历史按 `HISTORY_RETENTION_DAYS` 在应用启动时清理。
+鉴权：管理类接口在设置了 `API_TOKEN` 时需要 `Authorization: Bearer <token>`。订阅类在 `PUBLIC_PLAYLIST=true` 或未设置 Token 时按配置开放。
 
-## 当前仍需注意的限制
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/health` | 健康检查 |
+| GET | `/api/system/version` | 版本与代码 revision |
+| GET | `/api/system/status` | 状态（数据库 URL 已脱敏） |
+| GET | `/api/statistics` | 概览统计 |
+| GET | `/api/channels` | 频道结果（分页 `limit`/`offset`，筛选 `q`/`status`） |
+| POST | `/api/playlists/import` | JSON `{ "url": "https://..." }` |
+| POST | `/api/playlists/import-file` | 上传文件 |
+| GET | `/api/subscription/m3u` | 合格源 M3U；`download=1` 触发附件名 |
+| GET | `/api/subscription/json` | 合格源 JSON |
+| GET | `/api/playlists/m3u` / `json` | 同上，可带筛选参数 |
+| GET | `/api/player/channels` | 播放器结构化数据 |
+| POST | `/api/tests/start` | `mode=quick\|standard\|full`，可选 `source_ids` |
+| POST | `/api/tests/stop` | `job_id=` |
+| GET | `/api/tests/active` | 活动任务 |
+| GET | `/api/scheduler` | 定时配置与状态 |
+| PUT | `/api/scheduler` | 更新定时配置 |
+| POST | `/api/scheduler/run` | 立即执行一轮 |
+| GET | `/api/scheduler/runs` | 运行历史 |
+| CRUD | `/api/remote-playlists` | 远程订阅；`POST .../fetch` 立即拉取 |
+| GET | `/api/network/check` | `target=` 网络诊断 |
+| WS | `/ws/tests` | 测试进度推送 |
 
-1. 活动测试任务状态目前保存在进程内存；容器重启后不会恢复正在执行的任务，只会保留已经提交到 SQLite 的历史结果。
-2. 持续 Stability 测试尚未完全接入 Web 测试主流程；内存版 `source_pool.py` 不是删除依据。
-3. CLI 的 `--duration` 仍未实现真正的持续稳定性测试。
-4. 公开订阅如果包含 Cookie/Authorization/Origin，会把这些播放所需 Header 一并输出；生产环境不要把带敏感 Header 的订阅设置为公开。
+---
 
-### 源（Source）长期失败自动删除
+## 项目结构（简要）
 
-每次 **Standard / Full** 测试写入失败结果后检查（Quick 的 `segment_valid` 为空，不计入）：
+```text
+app/
+  api/           # FastAPI 路由
+  core/          # 配置、调度、版本
+  database/      # 模型、仓库、维护、去重
+  exporters/     # M3U 导出、Logo 解析
+  matcher/       # 频道 ID / 排序
+  parser/        # M3U/M3U8、URL 归一化、可靠流式读取
+  scoring/       # 百分制评分
+  services/      # 导入、测试、远程订阅
+  tester/        # 连通性、HLS、FFprobe、网络诊断
+  cli.py         # 命令行
+  main.py        # 应用入口与生命周期
+frontend/        # 单页管理界面
+tests/           # pytest
+Dockerfile
+docker-compose.portainer.yml
+PORTAINER.md
+```
 
-1. 最近连续失败次数 ≥ `SOURCE_AUTO_DELETE_FAILURES`（默认 **5**）
-2. **并且** 该连续失败跨度 ≥ `SOURCE_AUTO_DELETE_DAYS` 天（默认 **5**）
+---
 
-两条件同时满足才删除该源及其测试历史；若频道下已无其它源，一并删除空频道。成功一次测试会打断连续失败计数。
+## 设计要点与限制
 
-### 远程 M3U 失效自动删除
+**要点**
 
-远程 M3U 自动获取具有失效保护：HTTP 400/401/403/404/410/422、空 M3U 或无效 M3U 内容会立即删除远程订阅配置；超时、连接失败、HTTP 5xx 等临时错误默认连续失败 3 次后删除。阈值可通过 `REMOTE_PLAYLIST_MAX_FAILURES` 配置。自动删除只移除远程订阅配置和对应定时任务，不删除已经导入的频道和源。
+- 大 M3U / HLS 使用循环读取，避免单次 `read(n)` 截断  
+- 导入按「归一化 URL + 请求头」去重（`None` 与空字符串等价）  
+- CCTV-5 与 CCTV-5+ 分频道；`group-title` 含逗号、IPv6 URL、非法端口单条跳过  
+- 停止测试后任务进入终态，不长期占活动列表；FFprobe 取消时杀进程并带网络超时  
+- 频道列表单次窗口查询 + 前端分页，避免 N+1 与整表卡顿  
+
+**限制**
+
+1. 进行中的测试任务状态在进程内存中，**容器重启不会恢复进行中的任务**（已写入 SQLite 的结果仍在）  
+2. CLI `--duration` 未实现真正的长时稳定性循环  
+3. 若订阅含 Cookie/Authorization/Origin，导出时会写入播放所需 Header；公开订阅请谨慎  
+
+---
+
+## 开发与测试
+
+```bash
+pip install -r requirements.txt
+pytest -q
+```
+
+贡献代码时请保持：不在日志中打印敏感 Header；新增环境变量同步 `.env.example` 与 compose。
+
+---
+
+## 许可证与致谢
+
+- Logo 兜底数据来源：[vircloud/TVLogo](https://github.com/vircloud/TVLogo)（jsDelivr CDN）  
+- 部署与问题排查优先阅读 [`PORTAINER.md`](PORTAINER.md)
