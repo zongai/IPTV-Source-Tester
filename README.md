@@ -14,6 +14,13 @@ uvicorn app.main:app --reload
 
 Set `API_TOKEN` for management endpoints. Set `PUBLIC_PLAYLIST=true` to expose player playlist endpoints. Never log Cookie/Authorization values.
 
+### Docker / Portainer
+
+固定运行环境镜像 + 宿主机挂载 `app/`、`frontend/`（见 `PORTAINER.md`、`docker-compose.portainer.yml`）：
+
+- **代码 / 界面变更**：重启容器或刷新页面即可，**不必**重建镜像
+- **运行环境变更**（`Dockerfile`、`requirements.txt`、Python、FFmpeg、系统依赖）：**需要重新构建镜像**
+
 ## CLI
 
 `iptv import playlist.m3u`

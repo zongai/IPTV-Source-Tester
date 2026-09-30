@@ -16,9 +16,15 @@ class ImportURLRequest(BaseModel):
 
 
 async def _import_entries(entries, playlist_name: str):
+    """Run synchronous DB import off the event loop so tests keep progressing."""
+    import asyncio
+
     async with db_write_lock:
-        with SessionLocal() as s:
-            return import_entries(s, entries, playlist_name)
+        def _work():
+            with SessionLocal() as s:
+                return import_entries(s, entries, playlist_name)
+
+        return await asyncio.to_thread(_work)
 
 
 @router.post('/playlists/import', dependencies=[Depends(require_admin)])

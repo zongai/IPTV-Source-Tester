@@ -10,11 +10,17 @@
 - `/volume2/Data/iptv-tester/migrations`、`VERSION`：运行时资源，直接挂载；
 - `/volume2/Data/iptv-tester/data`：SQLite 数据。
 
-因此普通 Python/UI/配置代码变更**不需要重新构建镜像**。Python 代码修改后重启容器即可，前端文件通常刷新页面即可生效。只有 Python 版本、FFmpeg、系统库或 `requirements.txt` 等运行环境发生变化时才重新构建镜像。
+| 变更内容 | 需要做什么 |
+|----------|------------|
+| `app/`、`frontend/`、`migrations/`、`VERSION`、业务配置 | **不要**重建镜像；Python 代码改完**重启容器**，前端一般**刷新页面**即可 |
+| `Dockerfile`、`requirements.txt`、Python 版本、FFmpeg、系统包 | **必须重新构建镜像**，再滚动更新/重建容器 |
+
+> **默认提醒：只有运行环境变更才需要重新构建镜像。**  
+> 日常发版与修 bug 属于代码挂载更新，重建镜像既慢也容易用到旧层缓存。
 
 ### 1. 先准备固定运行环境镜像
 
-在 Synology SSH 上首次构建，或运行环境发生变化时再构建：
+**首次部署**，或确认运行环境（依赖/基础镜像）已变化时：
 
 ```bash
 cd /volume2/Data/iptv-tester

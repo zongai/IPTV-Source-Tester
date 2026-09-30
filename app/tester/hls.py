@@ -8,6 +8,7 @@ import aiohttp
 
 from app.core.config import get_settings
 from app.parser.m3u8 import parse_m3u8
+from app.parser.stream_read import read_at_most
 
 
 @dataclass
@@ -32,11 +33,20 @@ def _classify_exc(exc: Exception) -> str:
         return "TLS_ERROR"
     if isinstance(exc, aiohttp.ClientConnectorError):
         text = str(exc).lower()
+        # Do not treat connector "ssl:default" noise as a TLS failure.
         if "refused" in text:
             return "CONNECTION_REFUSED"
-        if "name or service not known" in text or "getaddrinfo" in text:
+        if any(
+            x in text
+            for x in (
+                "name or service not known",
+                "getaddrinfo",
+                "nodename nor servname",
+                "temporary failure in name resolution",
+            )
+        ):
             return "DNS_ERROR"
-        if "ssl" in text or "certificate" in text:
+        if "certificate" in text or "ssl handshake" in text or "tlsv" in text:
             return "TLS_ERROR"
         return "CONNECTION_ERROR"
     if isinstance(exc, aiohttp.ClientError):
@@ -92,7 +102,8 @@ async def _read_playlist(url, session, headers):
                                        error_message=f"playlist HTTP {status} ({elapsed:.2f}s)",
                                        playlist_url=final_url)
             max_bytes = int(get_settings().max_playlist_bytes)
-            body = await r.content.read(max_bytes + 1)
+            # Must loop-read: StreamReader.read(n) returns only one buffer chunk.
+            body = await read_at_most(r.content, max_bytes)
             if len(body) > max_bytes:
                 return None, HLSResult(False, error_type="PLAYLIST_TOO_LARGE",
                                        error_message=f"playlist exceeds {max_bytes} bytes",

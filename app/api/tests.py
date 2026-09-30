@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from app.api.auth import require_admin
@@ -76,13 +76,19 @@ async def run_job(job_id, deep=True, source_ids=None, mode=None):
         await runner.test_many(sources, deep=deep, mode=mode, on_result=save_result)
         if jobs[job_id].get('status') != 'stop_requested':
             jobs[job_id]['status'] = 'completed'
+        else:
+            # Cancel finished: leave terminal status so /tests/active drops it.
+            jobs[job_id]['status'] = 'stopped'
     except asyncio.CancelledError:
-        jobs[job_id]['status'] = 'stop_requested'
-    
+        jobs[job_id]['status'] = 'stopped'
     except Exception as exc:
         jobs[job_id]['status'] = 'failed'
         jobs[job_id]['error'] = str(exc)
     finally:
+        try:
+            await runner.close()
+        except Exception:
+            pass
         if session is not None:
             session.close()
         _job_tasks.pop(job_id, None)
@@ -120,6 +126,7 @@ async def stop(job_id: str):
 
 @router.get('/tests/active', dependencies=[Depends(require_admin)])
 async def active_jobs():
+    # Terminal statuses (completed/failed/stopped) must not linger as active.
     return [v for v in jobs.values() if v.get('status') in ('queued', 'running', 'stop_requested')]
 
 @router.get('/tests/{job_id}', dependencies=[Depends(require_admin)])

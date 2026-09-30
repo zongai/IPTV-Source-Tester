@@ -71,7 +71,7 @@ button:hover{filter:brightness(1.05)}
 .aux-body{padding:0 18px 16px;border-top:1px solid var(--border)}
 .aux-body .muted{margin-top:10px}
 #netResult{white-space:pre-wrap;background:#f9fafb;padding:12px;border-radius:8px;overflow:auto;border:1px solid var(--border);margin:10px 0 0;font-size:12px}
-.footer{padding:8px 0 28px;text-align:center;color:var(--muted);font-size:12px}
+.footer{padding:8px 0 28px;text-align:center;color:var(--muted);font-size:12px}.deploy-hint{margin-top:6px;font-size:11px;line-height:1.5;color:#9ca3af;max-width:720px;margin-left:auto;margin-right:auto}
 .version-badge{display:inline-block;padding:2px 8px;margin-left:4px;background:#eef2ff;color:#3730a3;border-radius:999px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
 @media(max-width:960px){
   main{padding:14px}
@@ -264,11 +264,19 @@ button:hover{filter:brightness(1.05)}
     </details>
   </section>
 </main>
-<footer class="footer">IPTV Source Tester V4</footer>
+<footer class="footer">
+  IPTV Source Tester V4
+  <div class="deploy-hint">代码/界面变更：重启容器或刷新页面即可 · 仅当 Python / FFmpeg / 系统依赖 / requirements.txt 等<strong>运行环境</strong>变更时需重新构建镜像</div>
+</footer>
 
 <script>
 
+
 const base = location.origin;
+
+function el(id){return document.getElementById(id)}
+function setText(id, text, cls){const e=el(id);if(!e)return;e.textContent=text;if(cls!==undefined)e.className=cls}
+
 
 const MODE_LABEL = { quick: '快速', standard: '标准', full: '完整' };
 const SCOPE_LABEL = { enabled: '全部启用源', failed: '仅失败源', stale: '超时未测源' };
@@ -304,11 +312,7 @@ async function req(url, opt = {}) {
   if (!r.ok) throw new Error((d && d.detail) || t || ('请求失败 ' + r.status));
   return d;
 }
-function msg(id, s, good = true) {
-  let e = document.getElementById(id);
-  e.textContent = s;
-  e.className = good ? 'ok' : 'bad';
-}
+function msg(id, s, good = true) { const e = el(id); if (!e) return; e.textContent = s; e.className = good ? 'ok' : 'bad'; }
 
 async function importUrl() {
   let url = document.getElementById('url').value.trim();
@@ -604,46 +608,48 @@ function fillSchedulerStatus(d) {
   const last = d.last_finished_at ? fmtTime(d.last_finished_at) : '尚无';
   const next = d.next_run_at ? fmtTime(d.next_run_at) : '未安排';
   const running = d.running ? ' · 正在运行' : '';
-  schStatus.textContent =
+  setText('schStatus',
     `${enabled} · ${mode}模式 · 并发 ${d.max_concurrency || 20}` +
     ` · 上次 ${last}（测 ${d.last_tested || 0}，败 ${d.last_failed || 0}）` +
-    ` · 下次 ${next}${running}`;
+    ` · 下次 ${next}${running}`);
 }
 
 async function loadScheduler() {
   try {
     let d = await req('/api/scheduler');
-    schEnabled.value = String(!!d.enabled);
-    schMode.value = d.test_mode || 'standard';
-    schInterval.value = d.interval_minutes || 30;
-    schScope.value = d.source_scope || 'enabled';
-    schStale.value = d.stale_hours || 24;
-    schConcurrency.value = d.max_concurrency || 20;
-    schHostConcurrency.value = d.max_host_concurrency || 5;
-    schConnectTimeout.value = d.connect_timeout || 5;
-    schReadTimeout.value = d.read_timeout || 10;
-    schSegments.value = d.segment_test_count || 3;
+    const setVal = (id, v) => { const e = el(id); if (e) e.value = v; };
+    setVal('schEnabled', String(!!d.enabled));
+    setVal('schMode', d.test_mode || 'standard');
+    setVal('schInterval', d.interval_minutes || 30);
+    setVal('schScope', d.source_scope || 'enabled');
+    setVal('schStale', d.stale_hours || 24);
+    setVal('schConcurrency', d.max_concurrency || 20);
+    setVal('schHostConcurrency', d.max_host_concurrency || 5);
+    setVal('schConnectTimeout', d.connect_timeout || 5);
+    setVal('schReadTimeout', d.read_timeout || 10);
+    setVal('schSegments', d.segment_test_count || 3);
     fillSchedulerStatus(d);
     await loadSchedulerRuns();
   } catch (e) {
-    schStatus.textContent = '定时设置加载失败：' + e.message;
+    setText('schStatus', '定时设置加载失败：' + e.message, 'bad');
   }
 }
 async function saveScheduler() {
   try {
+    const v = (id, def) => { const e = el(id); return e ? e.value : def; };
     await req('/api/scheduler', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        enabled: schEnabled.value === 'true',
-        test_mode: schMode.value,
-        interval_minutes: Number(schInterval.value),
-        source_scope: schScope.value,
-        stale_hours: Number(schStale.value),
-        max_concurrency: Number(schConcurrency.value),
-        max_host_concurrency: Number(schHostConcurrency.value),
-        connect_timeout: Number(schConnectTimeout.value),
-        read_timeout: Number(schReadTimeout.value),
-        segment_test_count: Number(schSegments.value),
+        enabled: v('schEnabled', 'true') === 'true',
+        test_mode: v('schMode', 'standard'),
+        interval_minutes: Number(v('schInterval', 30)),
+        source_scope: v('schScope', 'enabled'),
+        stale_hours: Number(v('schStale', 24)),
+        max_concurrency: Number(v('schConcurrency', 20)),
+        max_host_concurrency: Number(v('schHostConcurrency', 5)),
+        connect_timeout: Number(v('schConnectTimeout', 5)),
+        read_timeout: Number(v('schReadTimeout', 10)),
+        segment_test_count: Number(v('schSegments', 3)),
       }),
     });
     msg('schMsg', '定时任务设置已保存');
@@ -687,14 +693,18 @@ async function refreshSchedulerDisplay() {
   } catch (e) {}
 }
 async function loadAll() {
-  await Promise.all([loadStats(), loadChannels(true), loadScheduler(), loadRemotePlaylists(), updateSubs(), loadVersion()]);
+  await Promise.allSettled([
+    loadStats(), loadChannels(true), loadScheduler(),
+    loadRemotePlaylists(), updateSubs(), loadVersion(),
+  ]);
   try {
     let a = await req('/api/tests/active');
-    if (a.length) poll(a[0].id);
+    if (a && a.length) poll(a[0].id);
   } catch (e) {}
 }
 loadAll();
 setInterval(refreshSchedulerDisplay, 3000);
+
 
 </script>
 </body>

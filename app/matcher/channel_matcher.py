@@ -10,10 +10,11 @@ def channel_id_for(*, tvg_id=None, tvg_name=None, display_name=None):
     candidate = display_name or tvg_name or tvg_id or "unknown"
     n = normalize_channel_name(candidate)
 
-    # Known CCTV numbering aliases are deliberately collapsed.
-    m = re.fullmatch(r"CCTV-(\d+)(?:-PLUS)?", n)
+    # Known CCTV numbering aliases. Accept CCTV-5+, CCTV-5-PLUS, CCTV5+.
+    m = re.fullmatch(r"CCTV-(\d+)(?:-PLUS|\+)?", n)
     if m:
-        return f"cctv-{m.group(1)}-plus" if n.endswith("-PLUS") else f"cctv-{m.group(1)}"
+        is_plus = n.endswith("+") or n.endswith("-PLUS")
+        return f"cctv-{m.group(1)}-plus" if is_plus else f"cctv-{m.group(1)}"
 
     # Do NOT collapse non-Latin names to a shared "unknown" channel.
     # Python's \w is Unicode-aware, so Chinese/Japanese/etc. channel names

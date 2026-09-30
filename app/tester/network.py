@@ -37,10 +37,21 @@ def _error_type(exc):
         return "TLS_ERROR"
     if isinstance(exc, aiohttp.ClientConnectorError):
         msg = str(exc).lower()
+        # Connector messages often embed "ssl:default"; check real causes first.
         if "refused" in msg:
             return "CONNECTION_REFUSED"
-        if "getaddrinfo" in msg or "name or service not known" in msg:
+        if any(
+            x in msg
+            for x in (
+                "getaddrinfo",
+                "name or service not known",
+                "nodename nor servname",
+                "temporary failure in name resolution",
+            )
+        ):
             return "DNS_ERROR"
+        if "certificate" in msg or "ssl handshake" in msg or "tlsv" in msg:
+            return "TLS_ERROR"
         return "CONNECTION_ERROR"
     return "NETWORK_ERROR"
 

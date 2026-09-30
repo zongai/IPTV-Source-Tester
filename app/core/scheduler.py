@@ -64,7 +64,23 @@ class SchedulerService:
             remote_playlists = list(session.scalars(select(RemotePlaylistDB)).all())
         for playlist in remote_playlists:
             self.schedule_remote_playlist(playlist.id, playlist.interval_minutes, playlist.enabled)
+        # Periodic history cleanup (startup also runs once in app lifespan).
+        self.scheduler.add_job(
+            self._cleanup_history,
+            "interval",
+            hours=24,
+            id="iptv-history-cleanup",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
         self.scheduler.start()
+
+    async def _cleanup_history(self):
+        from app.database.maintenance import cleanup_old_test_results
+
+        async with db_write_lock:
+            await asyncio.to_thread(cleanup_old_test_results)
 
     def _schedule(self, minutes: int):
         self.scheduler.add_job(
