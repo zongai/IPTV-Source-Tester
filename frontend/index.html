@@ -360,8 +360,7 @@ async function checkNetwork() {
     if (d.final_url) lines.push('最终地址：' + d.final_url);
     if (d.error_type) lines.push('错误类型：' + d.error_type);
     if (d.error_message) lines.push('错误说明：' + d.error_message);
-    e.textContent = lines.join('
-');
+    e.textContent = lines.join('\n');
     e.className = d.ok ? 'ok' : 'bad';
   } catch (err) {
     e.textContent = '检测失败：' + err.message;
