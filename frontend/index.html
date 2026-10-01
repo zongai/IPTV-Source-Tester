@@ -348,6 +348,7 @@ button.sm{padding:6px 10px;font-size:12px}
               <div class="row">
                 <button onclick="startTest()">开始测试全部</button>
                 <button class="secondary" onclick="loadAll()">刷新</button>
+                <button class="secondary" onclick="purgeFailedSources()" title="删除最近一次验证失败的源">删除失效源</button>
               </div>
             </div>
           </div>
@@ -659,6 +660,24 @@ async function checkNetwork() {
   } catch (err) {
     e.textContent = '检测失败：' + err.message;
     e.className = 'bad';
+  }
+}
+
+
+async function purgeFailedSources() {
+  try {
+    let preview = await req('/api/sources/failed');
+    let n = preview.count || 0;
+    if (!n) {
+      msg('testMsg', '当前没有可删除的失效源', true);
+      return;
+    }
+    if (!confirm(`确认删除 ${n} 个失效源？\n（最近一次验证失败，或状态为失败的源；未测试的源不会删除）`)) return;
+    let d = await req('/api/sources/purge-failed', { method: 'POST' });
+    msg('testMsg', `已删除失效源 ${d.deleted_sources || 0} 个` + (d.deleted_channels ? `，并清理空频道 ${d.deleted_channels} 个` : ''), true);
+    await loadAll();
+  } catch (e) {
+    msg('testMsg', '删除失效源失败：' + e.message, false);
   }
 }
 

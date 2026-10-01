@@ -160,3 +160,85 @@ def maybe_auto_delete_failed_source(session: Session, source_id: int) -> dict | 
         (url or "")[:120],
     )
     return summary
+
+
+def _latest_validated_result(session: Session, source_id: int) -> TestResultDB | None:
+    return session.scalars(
+        select(TestResultDB)
+        .where(
+            TestResultDB.source_id == source_id,
+            TestResultDB.segment_valid.is_not(None),
+        )
+        .order_by(TestResultDB.tested_at.desc())
+        .limit(1)
+    ).first()
+
+
+def list_failed_source_ids(session: Session) -> list[int]:
+    """Sources considered invalid: latest validated result failed, or status marks failure."""
+    ids: list[int] = []
+    for src in session.scalars(select(SourceDB)).all():
+        if src.status in {"temporarily_failed", "inactive", "failed"}:
+            ids.append(src.id)
+            continue
+        latest = _latest_validated_result(session, src.id)
+        if latest is not None and latest.segment_valid is False:
+            ids.append(src.id)
+    return ids
+
+
+def delete_source_cascade(session: Session, source_id: int) -> dict | None:
+    """Delete one source, its test results, and the channel if empty."""
+    source = session.get(SourceDB, source_id)
+    if source is None:
+        return None
+    channel_id = source.channel_id
+    url = source.url
+    session.execute(delete(TestResultDB).where(TestResultDB.source_id == source_id))
+    session.delete(source)
+    session.flush()
+    remaining = session.scalar(
+        select(SourceDB.id).where(SourceDB.channel_id == channel_id).limit(1)
+    )
+    channel_deleted = False
+    if remaining is None:
+        ch = session.get(ChannelDB, channel_id)
+        if ch is not None:
+            session.delete(ch)
+            channel_deleted = True
+    return {
+        "source_id": source_id,
+        "channel_id": channel_id,
+        "url": url,
+        "channel_deleted": channel_deleted,
+    }
+
+
+def purge_failed_sources(session: Session) -> dict:
+    """One-shot delete of all currently failed/invalid sources.
+
+    A source is purged when:
+    - status is temporarily_failed / inactive / failed, or
+    - the latest validated test result has segment_valid == False.
+
+    Untested sources (no validated result) are kept.
+    """
+    target_ids = list_failed_source_ids(session)
+    deleted = []
+    channels_removed = 0
+    for sid in target_ids:
+        info = delete_source_cascade(session, sid)
+        if info:
+            deleted.append(info)
+            if info.get("channel_deleted"):
+                channels_removed += 1
+    logger.warning(
+        "Purged %s failed sources (%s empty channels removed)",
+        len(deleted),
+        channels_removed,
+    )
+    return {
+        "deleted_sources": len(deleted),
+        "deleted_channels": channels_removed,
+        "source_ids": [x["source_id"] for x in deleted],
+    }
