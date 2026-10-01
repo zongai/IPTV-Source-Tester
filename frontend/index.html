@@ -95,7 +95,14 @@ button.sm{padding:6px 10px;font-size:12px}
 .metric-warn,.score-mid{background:var(--warn-bg);color:var(--warn)}
 .legend{display:flex;gap:9px;flex-wrap:wrap;margin:8px 0 12px}
 .legend span{font-size:12px}
-.note{font-size:12px;line-height:1.7;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-top:10px}
+.note{font-size:12px;line-height:1.7;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-top:0}
+.note-details{margin:8px 0 4px}
+.note-details>summary{list-style:none;cursor:pointer;user-select:none;font-size:12px;font-weight:600;color:#4b5563;display:inline-flex;align-items:center;gap:6px}
+.note-details>summary::-webkit-details-marker{display:none}
+.note-details>summary::after{content:"展开";font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 8px}
+.note-details[open]>summary::after{content:"收起"}
+.note-details>summary:hover{color:var(--ink)}
+.note-details .note{margin-top:8px}
 .hint{font-size:12px;line-height:1.65;color:var(--muted);margin:8px 0 0}
 .scheduler-runs{font-size:12px;line-height:1.6}
 .status-line{font-size:12px;line-height:1.6;color:var(--muted);margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;border:1px solid #eef2f7}
@@ -431,7 +438,9 @@ button.sm{padding:6px 10px;font-size:12px}
         <span class="score-mid">评分 70–89.99</span>
         <span class="score-bad">评分 &lt; 70</span>
       </div>
-      <div class="note"><b>数值说明：</b><br>
+      <details class="note-details">
+        <summary>数值说明</summary>
+        <div class="note">
 评分满分 100：可用性 30 分 + 稳定性 25 分 + 延迟 15 分 + 速度 15 分 + 分辨率 10 分 + 启动时间 5 分。<br>
 延迟：按首字节 TTFB 计算，15 ÷ (1 + ms/250)，越低越好。<br>
 速度：按平均分片速度，≥20 Mbps=15、≥10=13、≥5=10、≥2.5=7、≥1=4、&lt;1=0。<br>
@@ -439,7 +448,9 @@ button.sm{padding:6px 10px;font-size:12px}
 稳定性：本次成功分片数 / 测试分片数；失败率 = 1 − 稳定性。<br>
 颜色：绿色=通过/较优，橙色=中等，红色=失败/较差。<br>
 速度颜色：绿色 ≥10 Mbps，橙色 2.5–&lt;10 Mbps，红色 &lt;2.5 Mbps。<br>
-延迟颜色：绿色 ≤250 ms，橙色 250–1000 ms，红色 &gt;1000 ms。</div>
+延迟颜色：绿色 ≤250 ms，橙色 250–1000 ms，红色 &gt;1000 ms。
+        </div>
+      </details>
       <div class="row" style="margin-top:10px">
         <input id="chQuery" type="text" placeholder="搜索频道名称" style="min-width:160px;flex:0 1 220px">
         <select id="chStatus">
