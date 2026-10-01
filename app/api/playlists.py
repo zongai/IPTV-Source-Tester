@@ -89,7 +89,7 @@ def payload(min_score=0.0, min_stability=0.0, min_height=0, min_speed=0.0):
                 continue
             if (r.download_speed or 0) < min_speed:
                 continue
-            logo = resolve_tvg_logo(c.display_name or c.id, c.tvg_logo)
+            logo = resolve_tvg_logo(c.display_name, c.tvg_logo, channel_id=c.id)
             # Unified rule-based group (央视/卫视/其他), never playlist group-title.
             ch_group = c.group_name or rule_group_for_key(c.id, c.display_name)
             bucket = grouped.setdefault(c.id, {

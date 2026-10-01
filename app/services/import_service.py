@@ -156,7 +156,7 @@ def import_entries(session, entries, playlist_name=None):
         cid = ident.key
         display = ident.display_name
         rule_group = ident.group
-        logo = resolve_tvg_logo(display or cid, e.tvg_logo)
+        logo = resolve_tvg_logo(display, e.tvg_logo, channel_id=cid)
         c = session.get(ChannelDB, cid)
         if not c:
             c = ChannelDB(
