@@ -69,14 +69,22 @@ button.sm{padding:6px 10px;font-size:12px}
 .channels-table th:nth-child(7),.channels-table td:nth-child(7){width:11%;text-align:right}
 .channels-table th:nth-child(8),.channels-table td:nth-child(8){width:9%;text-align:center}
 .channels-table th:nth-child(9),.channels-table td:nth-child(9){width:9%;word-break:break-word}
-.url-cell{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#374151}
+.url-cell{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#374151;cursor:default}
 .url-cell:hover{color:var(--accent)}
-.remote-table .col-name{width:110px;font-weight:600;white-space:nowrap}
-.remote-table .col-url{min-width:160px}
-.remote-table .col-switch,.remote-table .col-interval,.remote-table .col-stat{white-space:nowrap}
-.remote-table .col-ops{width:110px}
+.remote-table{table-layout:fixed;min-width:0;width:100%}
+.remote-table .col-name{width:88px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.remote-table .col-url{width:auto}
+.remote-table .col-switch{width:56px;text-align:center;white-space:nowrap}
+.remote-table .col-interval{width:88px;white-space:nowrap}
+.remote-table .col-fetched{width:128px;white-space:nowrap;font-size:12px}
+.remote-table .col-result{width:72px;white-space:nowrap}
+.remote-table .col-stat{width:110px;white-space:nowrap;font-size:12px}
+.remote-table .col-ops{width:168px}
+.btn-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.btn-row button{width:auto}
 .sch-table .col-id{width:56px}
 .sch-table td{font-size:13px}
+#remoteMsg{min-height:1.4em;margin:8px 0 0}
 .sub{display:block;padding:7px 0;word-break:break-all}
 .progress{height:8px;background:#e5e7eb;border-radius:10px;overflow:hidden;margin-top:8px}
 .progress>i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s ease}
@@ -179,10 +187,17 @@ button.sm{padding:6px 10px;font-size:12px}
   .data-table{min-width:480px}
   .result-table th,.result-table td,
   .data-table th,.data-table td{padding:8px 6px}
-  .url-cell{max-width:120px;font-size:11px}
-  .remote-table .col-ops{width:96px}
-  .btn-stack{gap:4px}
-  .btn-stack button{min-height:36px}
+  .url-cell{font-size:11px}
+  .remote-table{min-width:640px}
+  .remote-table .col-name{width:64px}
+  .remote-table .col-switch{width:48px}
+  .remote-table .col-interval{width:72px}
+  .remote-table .col-fetched{width:100px}
+  .remote-table .col-result{width:56px}
+  .remote-table .col-stat{width:96px}
+  .remote-table .col-ops{width:148px}
+  .btn-row{gap:4px}
+  .btn-row button{min-height:36px}
   .legend{gap:6px;margin:6px 0 8px}
   .legend span{font-size:11px}
   .note{padding:8px 10px;font-size:11px;line-height:1.55}
@@ -503,7 +518,25 @@ async function req(url, opt = {}) {
   if (!r.ok) throw new Error((d && d.detail) || t || ('请求失败 ' + r.status));
   return d;
 }
-function msg(id, s, good = true) { const e = el(id); if (!e) return; e.textContent = s; e.className = good ? 'ok' : 'bad'; }
+const _msgTimers = {};
+function msg(id, s, good = true) {
+  const e = el(id);
+  if (!e) return;
+  e.textContent = s;
+  e.className = good ? 'ok' : 'bad';
+  if (_msgTimers[id]) clearTimeout(_msgTimers[id]);
+  if (s && good) {
+    _msgTimers[id] = setTimeout(() => {
+      if (e.textContent === s) { e.textContent = ''; e.className = 'muted'; }
+    }, 6000);
+  }
+}
+function shortUrl(u) {
+  if (!u) return '';
+  const s = String(u);
+  if (s.length <= 56) return s;
+  return s.slice(0, 28) + '…' + s.slice(-20);
+}
 
 async function importUrl() {
   let url = document.getElementById('url').value.trim();
@@ -775,17 +808,18 @@ async function loadRemotePlaylists() {
       if (x.last_status === 'failed' && fail)
         status += `（连续失败 ${fail}/${x.auto_delete_after_failures || 3}）`;
       const url = x.url || '';
+      const resultText = escapeHtml(status) + (x.last_error ? '：' + escapeHtml(x.last_error) : '');
       return `<tr>
-        <td class="col-name">${escapeHtml(x.name)}</td>
-        <td class="col-url"><span class="url-cell" title="${escapeHtml(url)}">${escapeHtml(url)}</span></td>
+        <td class="col-name" title="${escapeHtml(x.name)}">${escapeHtml(x.name)}</td>
+        <td class="col-url"><span class="url-cell" title="${escapeHtml(url)}">${escapeHtml(shortUrl(url))}</span></td>
         <td class="col-switch">${x.enabled ? '启用' : '停用'}</td>
-        <td class="col-interval">${x.interval_minutes} 分钟</td>
-        <td>${x.last_fetched_at ? fmtTime(x.last_fetched_at) : '从未获取'}</td>
-        <td>${escapeHtml(status)}${x.last_error ? '：' + escapeHtml(x.last_error) : ''}</td>
-        <td class="col-stat">新增 ${x.last_added || 0} / 跳过 ${x.last_skipped || 0}</td>
+        <td class="col-interval">${x.interval_minutes} 分</td>
+        <td class="col-fetched">${x.last_fetched_at ? fmtTime(x.last_fetched_at) : '从未获取'}</td>
+        <td class="col-result" title="${resultText}">${escapeHtml(status)}</td>
+        <td class="col-stat">+${x.last_added || 0} / 跳过 ${x.last_skipped || 0}</td>
         <td class="col-ops">
-          <div class="btn-stack">
-            <button class="sm" onclick="fetchRemote(${x.id})">立即获取</button>
+          <div class="btn-row">
+            <button class="sm" onclick="fetchRemote(${x.id})">获取</button>
             <button class="secondary sm" onclick="toggleRemote(${x.id}, ${!x.enabled})">${x.enabled ? '停用' : '启用'}</button>
             <button class="secondary sm" onclick="deleteRemote(${x.id})">删除</button>
           </div>
@@ -793,7 +827,8 @@ async function loadRemotePlaylists() {
       </tr>`;
     }).join('');
     box.innerHTML = `<div class="result-table-wrap"><table class="data-table remote-table"><thead><tr>
-      <th>名称</th><th>地址</th><th>开关</th><th>间隔</th><th>上次获取</th><th>结果</th><th>导入统计</th><th>操作</th>
+      <th class="col-name">名称</th><th class="col-url">地址</th><th class="col-switch">开关</th><th class="col-interval">间隔</th>
+      <th class="col-fetched">上次获取</th><th class="col-result">结果</th><th class="col-stat">导入统计</th><th class="col-ops">操作</th>
     </tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (e) {
     box.textContent = '远程订阅加载失败：' + e.message;
