@@ -9,11 +9,13 @@ from app.database.models import SourceDB, TestResultDB, SchedulerConfigDB, Sched
 from app.database.repository import maybe_auto_delete_failed_source, retain_ffprobe_media_fields
 from app.services.remote_playlist_service import fetch_remote_playlist
 from app.services.test_service import TestRunner
+from app.utils.timeutil import app_timezone
 
 
 class SchedulerService:
     def __init__(self):
-        self.scheduler = AsyncIOScheduler()
+        # Use container TZ so next_run_at aligns with local wall clock.
+        self.scheduler = AsyncIOScheduler(timezone=app_timezone())
         self._running_job: asyncio.Task | None = None
         self._run_lock = asyncio.Lock()
         self.job_id = "iptv-periodic-test"

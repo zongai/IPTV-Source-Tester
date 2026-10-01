@@ -12,6 +12,7 @@ from app.exporters.m3u import render_m3u
 from app.matcher.channel_matcher import channel_sort_key
 from app.parser.normalizer import infer_default_group
 from app.core.config import get_settings
+from app.utils.timeutil import to_iso
 
 router = APIRouter()
 
@@ -109,7 +110,7 @@ def payload(min_score=0.0, min_stability=0.0, min_height=0, min_speed=0.0):
                 'resolution': r.height, 'bitrate': r.bitrate,
                 'score': r.score, 'stability': r.stability, 'speed': r.download_speed,
                 'latency': r.ttfb * 1000 if r.ttfb else None,
-                'tested_at': r.tested_at.isoformat() if r.tested_at else None,
+                'tested_at': to_iso(r.tested_at),
             })
         out = list(grouped.values())
         out.sort(key=lambda c: channel_sort_key(c['name']))

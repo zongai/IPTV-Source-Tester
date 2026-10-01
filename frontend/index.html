@@ -509,7 +509,17 @@ function escapeHtml(s) {
 }
 function fmtTime(v) {
   if (!v) return '-';
-  try { return new Date(v).toLocaleString(); } catch { return String(v); }
+  try {
+    let s = String(v).trim();
+    // Backend stores UTC; naive ISO strings must be treated as UTC.
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(s)) {
+      s = s.replace(' ', 'T');
+      if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+    }
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return String(v);
+    return d.toLocaleString();
+  } catch { return String(v); }
 }
 async function req(url, opt = {}) {
   let r = await fetch(url, opt);

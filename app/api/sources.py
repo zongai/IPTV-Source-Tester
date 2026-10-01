@@ -4,6 +4,7 @@ from app.api.auth import require_admin
 from app.database.database import SessionLocal
 from app.database.models import SourceDB,TestResultDB
 from app.services.statistics_service import history,summarize
+from app.utils.timeutil import to_iso
 router=APIRouter()
 @router.get('/sources',dependencies=[Depends(require_admin)])
 def sources():
@@ -15,4 +16,4 @@ def source(source_id:int):
 @router.get('/sources/{source_id}/history',dependencies=[Depends(require_admin)])
 def source_history(source_id:int,days:int=7):
  with SessionLocal() as s:
-  rows=history(s,source_id,days);return {'summary':summarize(rows),'results':[{'id':r.id,'tested_at':r.tested_at.isoformat(),'score':r.score,'ttfb':r.ttfb,'speed':r.download_speed,'failure_rate':r.failure_rate} for r in rows]}
+  rows=history(s,source_id,days);return {'summary':summarize(rows),'results':[{'id':r.id,'tested_at':to_iso(r.tested_at),'score':r.score,'ttfb':r.ttfb,'speed':r.download_speed,'failure_rate':r.failure_rate} for r in rows]}

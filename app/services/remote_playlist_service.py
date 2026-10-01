@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from app.utils.timeutil import to_iso
+
 import aiohttp
 
 from app.core.config import get_settings
@@ -41,7 +43,7 @@ def _auto_delete_locked(session, playlist: RemotePlaylistDB, reason: str):
         "url": url,
         "auto_deleted": True,
         "reason": reason[:2000],
-        "deleted_at": now.isoformat(),
+        "deleted_at": to_iso(now),
     }
 
 
@@ -121,7 +123,7 @@ async def fetch_remote_playlist(playlist_id: int):
                 "entries": len(entries),
                 "auto_deleted": False,
                 **result,
-                "fetched_at": playlist.last_fetched_at.isoformat(),
+                "fetched_at": to_iso(playlist.last_fetched_at),
             }
     except Exception as exc:
         with SessionLocal() as session:

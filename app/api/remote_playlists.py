@@ -8,6 +8,7 @@ from app.database.database import SessionLocal
 from app.database.models import RemotePlaylistDB
 from app.core.scheduler import scheduler_service
 from app.core.config import get_settings
+from app.utils.timeutil import to_iso
 
 router = APIRouter()
 
@@ -30,13 +31,13 @@ def _row(x):
     return {
         "id": x.id, "name": x.name, "url": x.url, "enabled": x.enabled,
         "interval_minutes": x.interval_minutes,
-        "last_fetched_at": x.last_fetched_at.isoformat() if x.last_fetched_at else None,
+        "last_fetched_at": to_iso(x.last_fetched_at),
         "last_status": x.last_status, "last_added": x.last_added,
         "last_skipped": x.last_skipped, "last_error": x.last_error,
         "consecutive_failures": x.consecutive_failures or 0,
         "auto_delete_after_failures": get_settings().remote_playlist_max_failures,
-        "auto_deleted_at": x.auto_deleted_at.isoformat() if x.auto_deleted_at else None,
-        "updated_at": x.updated_at.isoformat() if x.updated_at else None,
+        "auto_deleted_at": to_iso(x.auto_deleted_at),
+        "updated_at": to_iso(x.updated_at),
     }
 
 

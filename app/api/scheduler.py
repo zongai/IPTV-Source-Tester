@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from app.api.auth import require_admin
 from app.core.scheduler import scheduler_service
+from app.utils.timeutil import to_iso
 
 router = APIRouter()
 
@@ -20,7 +21,7 @@ class SchedulerUpdate(BaseModel):
 
 
 def serialize(d):
-    return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in d.items()}
+    return {k: (to_iso(v) if isinstance(v, datetime) else v) for k, v in d.items()}
 
 @router.get('/scheduler', dependencies=[Depends(require_admin)])
 async def get_scheduler():

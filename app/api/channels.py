@@ -6,6 +6,7 @@ from app.api.auth import require_admin
 from app.database.database import SessionLocal
 from app.database.models import ChannelDB, SourceDB, TestResultDB
 from app.matcher.channel_matcher import channel_sort_key
+from app.utils.timeutil import to_iso
 
 router = APIRouter()
 
@@ -81,7 +82,7 @@ def channels(
                 "error_type": r.error_type if r else None,
                 # Keep messages short in the list payload.
                 "error_message": (r.error_message[:200] if r and r.error_message else None),
-                "tested_at": r.tested_at.isoformat() if r and r.tested_at else None,
+                "tested_at": to_iso(r.tested_at) if r else None,
             }
             if status == "pass" and item["segment_valid"] is not True:
                 continue
@@ -163,7 +164,7 @@ def channel_sources(channel_id):
                     "segment_valid": r.segment_valid if r else None,
                     "error_type": r.error_type if r else None,
                     "error_message": r.error_message if r else None,
-                    "tested_at": r.tested_at.isoformat() if r and r.tested_at else None,
+                    "tested_at": to_iso(r.tested_at) if r else None,
                 }
             )
         return out
