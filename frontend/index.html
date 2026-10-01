@@ -20,36 +20,61 @@ main{max-width:1400px;margin:auto;padding:20px 24px 32px}
 .section-title{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:700;color:#374151;letter-spacing:.02em;text-transform:uppercase}
 .section-title::after{content:"";flex:1;height:1px;background:var(--border)}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-import{display:grid;grid-template-columns:1.1fr .9fr;gap:12px}
 .grid-stats{display:grid;grid-template-columns:1fr;gap:14px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:0}
 .card h2{margin:0 0 12px;font-size:1.05rem}
+.card h3{margin:0 0 8px;font-size:.92rem;color:#4b5563;font-weight:600}
+.card-stack{display:flex;flex-direction:column;gap:14px}
 .card + .card{margin-top:0}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .row + .row,.row-gap{margin-top:10px}
+.field-row{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field > label,.field-label{font-size:12px;color:var(--muted);font-weight:500;line-height:1.2}
+.field input,.field select{min-width:0}
+.field-inline{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.field-inline input{width:80px}
+.divider-soft{border:0;border-top:1px solid var(--border);margin:14px 0}
 input,select,button{padding:9px 11px;border:1px solid #d1d5db;border-radius:8px;font:inherit}
-input[type=url],input[type=text]{flex:1;min-width:220px}
-button{cursor:pointer;background:var(--ink);color:#fff;border-color:var(--ink)}
+input[type=url],input[type=text]{flex:1;min-width:180px}
+input[type=number]{width:80px}
+button{cursor:pointer;background:var(--ink);color:#fff;border-color:var(--ink);white-space:nowrap}
 button.secondary{background:#fff;color:var(--ink);border-color:#d1d5db}
 button:hover{filter:brightness(1.05)}
+button.sm{padding:6px 10px;font-size:12px}
+.btn-stack{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.btn-stack button{width:100%}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr));gap:10px}
 .stat{padding:12px;background:#f9fafb;border:1px solid var(--border);border-radius:10px}
 .stat b{font-size:20px;display:block;margin-top:2px}.stat-unit{font-size:12px;font-weight:500;color:var(--muted);margin-left:3px}
 .ok{color:var(--ok)}.bad{color:var(--bad)}.muted{color:var(--muted)}.warn{color:var(--warn)}.info{color:#1d4ed8}
 .result-table-wrap{overflow:auto;border:1px solid var(--border);border-radius:10px;margin-top:12px;max-height:70vh}
-.result-table{width:100%;min-width:980px;border-collapse:separate;border-spacing:0;table-layout:fixed}
-.result-table th,.result-table td{text-align:left;padding:10px 9px;border-bottom:1px solid #edf0f2;vertical-align:middle}
-.result-table th{position:sticky;top:0;z-index:2;background:var(--head);font-weight:700;color:#374151;box-shadow:0 1px 0 var(--border)}
-.result-table tbody tr:nth-child(even){background:#fcfcfd}
-.result-table tbody tr:hover{background:#f1f5f9}
-.result-table th:nth-child(1),.result-table td:nth-child(1){width:24%;font-weight:600}
-.result-table th:nth-child(2),.result-table td:nth-child(2){width:8%;text-align:center}
-.result-table th:nth-child(3),.result-table td:nth-child(3){width:9%;text-align:center}
-.result-table th:nth-child(4),.result-table td:nth-child(4){width:9%;text-align:center}
-.result-table th:nth-child(5),.result-table td:nth-child(5){width:8%;text-align:center}
-.result-table th:nth-child(6),.result-table td:nth-child(6){width:13%;text-align:right}
-.result-table th:nth-child(7),.result-table td:nth-child(7){width:11%;text-align:right}
-.result-table th:nth-child(8),.result-table td:nth-child(8){width:9%;text-align:center}
-.result-table th:nth-child(9),.result-table td:nth-child(9){width:9%;word-break:break-word}
+.result-table,.data-table{width:100%;border-collapse:separate;border-spacing:0}
+.result-table{min-width:980px;table-layout:fixed}
+.data-table{min-width:720px;table-layout:auto}
+.result-table th,.result-table td,.data-table th,.data-table td{text-align:left;padding:10px 9px;border-bottom:1px solid #edf0f2;vertical-align:middle}
+.result-table th,.data-table th{position:sticky;top:0;z-index:2;background:var(--head);font-weight:700;color:#374151;box-shadow:0 1px 0 var(--border);white-space:nowrap}
+.result-table tbody tr:nth-child(even),.data-table tbody tr:nth-child(even){background:#fcfcfd}
+.result-table tbody tr:hover,.data-table tbody tr:hover{background:#f1f5f9}
+/* 频道结果表列宽（仅 .channels-table） */
+.channels-table th:nth-child(1),.channels-table td:nth-child(1){width:24%;font-weight:600}
+.channels-table th:nth-child(2),.channels-table td:nth-child(2){width:8%;text-align:center}
+.channels-table th:nth-child(3),.channels-table td:nth-child(3){width:9%;text-align:center}
+.channels-table th:nth-child(4),.channels-table td:nth-child(4){width:9%;text-align:center}
+.channels-table th:nth-child(5),.channels-table td:nth-child(5){width:8%;text-align:center}
+.channels-table th:nth-child(6),.channels-table td:nth-child(6){width:13%;text-align:right}
+.channels-table th:nth-child(7),.channels-table td:nth-child(7){width:11%;text-align:right}
+.channels-table th:nth-child(8),.channels-table td:nth-child(8){width:9%;text-align:center}
+.channels-table th:nth-child(9),.channels-table td:nth-child(9){width:9%;word-break:break-word}
+.url-cell{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#374151}
+.url-cell:hover{color:var(--accent)}
+.remote-table .col-name{width:110px;font-weight:600;white-space:nowrap}
+.remote-table .col-url{min-width:160px}
+.remote-table .col-switch,.remote-table .col-interval,.remote-table .col-stat{white-space:nowrap}
+.remote-table .col-ops{width:110px}
+.sch-table .col-id{width:56px}
+.sch-table td{font-size:13px}
 .sub{display:block;padding:7px 0;word-break:break-all}
 .progress{height:8px;background:#e5e7eb;border-radius:10px;overflow:hidden;margin-top:8px}
 .progress>i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s ease}
@@ -61,7 +86,9 @@ button:hover{filter:brightness(1.05)}
 .legend{display:flex;gap:9px;flex-wrap:wrap;margin:8px 0 12px}
 .legend span{font-size:12px}
 .note{font-size:12px;line-height:1.7;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-top:10px}
+.hint{font-size:12px;line-height:1.65;color:var(--muted);margin:8px 0 0}
 .scheduler-runs{font-size:12px;line-height:1.6}
+.status-line{font-size:12px;line-height:1.6;color:var(--muted);margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;border:1px solid #eef2f7}
 .aux-details{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:0;overflow:hidden}
 .aux-details>summary{list-style:none;cursor:pointer;padding:14px 18px;font-weight:700;font-size:1.05rem;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .aux-details>summary::-webkit-details-marker{display:none}
@@ -75,11 +102,13 @@ button:hover{filter:brightness(1.05)}
 .version-badge{display:inline-block;padding:2px 8px;margin-left:4px;background:#eef2ff;color:#3730a3;border-radius:999px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
 @media(max-width:960px){
   main{padding:14px}
-  .grid-2{grid-template-columns:1fr}
+  .grid-2,.grid-import{grid-template-columns:1fr}
   .stats{grid-template-columns:repeat(2,1fr)}
-  input[type=url]{min-width:160px}
+  input[type=url],input[type=text]{min-width:140px}
   .result-table-wrap{max-height:65vh}
   .result-table{min-width:900px}
+  .data-table{min-width:640px}
+  .url-cell{max-width:180px}
   .note{font-size:11px}
 }
 
@@ -105,30 +134,49 @@ button:hover{filter:brightness(1.05)}
 
   <section class="section">
     <div class="section-title">源管理</div>
-    <div class="grid-2">
+    <div class="card-stack">
       <div class="card">
         <h2>导入 M3U / M3U8</h2>
-        <div class="row">
-          <input id="url" type="url" placeholder="https://example.com/playlist.m3u">
-          <button onclick="importUrl()">导入地址</button>
-        </div>
-        <div class="row row-gap">
-          <input id="file" type="file" accept=".m3u,.m3u8,.txt">
-          <button onclick="importFile()">上传本地文件</button>
+        <div class="grid-import">
+          <div class="field">
+            <span class="field-label">远程地址</span>
+            <div class="row">
+              <input id="url" type="url" placeholder="https://example.com/playlist.m3u">
+              <button onclick="importUrl()">导入地址</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label">本地文件</span>
+            <div class="row">
+              <input id="file" type="file" accept=".m3u,.m3u8,.txt">
+              <button onclick="importFile()">上传本地文件</button>
+            </div>
+          </div>
         </div>
         <p id="importMsg" class="muted"></p>
       </div>
       <div class="card">
         <h2>远程 M3U 自动获取</h2>
-        <div class="row">
-          <input id="remoteName" placeholder="名称，例如：主订阅">
-          <input id="remoteUrl" type="url" placeholder="https://example.com/playlist.m3u">
+        <div class="field-row">
+          <div class="field" style="flex:0 1 160px">
+            <span class="field-label">名称</span>
+            <input id="remoteName" type="text" placeholder="例如：主订阅" style="min-width:120px;width:100%">
+          </div>
+          <div class="field" style="flex:1 1 280px">
+            <span class="field-label">订阅地址</span>
+            <input id="remoteUrl" type="url" placeholder="https://example.com/playlist.m3u" style="width:100%">
+          </div>
+          <div class="field" style="flex:0 0 auto">
+            <span class="field-label">获取间隔</span>
+            <div class="field-inline">
+              <input id="remoteInterval" type="number" min="1" max="10080" value="360">
+              <span class="muted">分钟</span>
+              <button onclick="addRemote()">添加</button>
+            </div>
+          </div>
         </div>
-        <div class="row row-gap">
-          <label>获取间隔 <input id="remoteInterval" type="number" min="1" max="10080" value="360" style="width:80px"> 分钟</label>
-          <button onclick="addRemote()">添加</button>
-        </div>
-        <p class="muted">按各自间隔自动拉取并导入；相同地址不会重复添加。永久失效（如 401/403/404）会立即删除订阅配置；临时错误连续失败 3 次后删除。仅删除订阅配置，不影响已导入的频道和源。</p>
+        <p class="hint">按各自间隔自动拉取并导入；相同地址不会重复添加。永久失效（如 401/403/404）会立即删除订阅配置；临时错误连续失败 3 次后删除。仅删除订阅配置，不影响已导入的频道和源。</p>
+        <p id="remoteMsg" class="muted" style="margin:8px 0 0"></p>
         <div id="remotePlaylists" class="muted">加载中…</div>
       </div>
     </div>
@@ -136,65 +184,114 @@ button:hover{filter:brightness(1.05)}
 
   <section class="section">
     <div class="section-title">测试</div>
-    <div class="grid-2">
-      <div class="card">
-        <h2>手动测试</h2>
-        <div class="row">
-          <label>模式
-            <select id="manualMode">
-              <option value="quick">快速（仅连接）</option>
-              <option value="standard" selected>标准（HLS+分片）</option>
-              <option value="full">完整（含 FFprobe）</option>
-            </select>
-          </label>
-          <button onclick="startTest()">开始测试全部</button>
-          <button class="secondary" onclick="loadAll()">刷新</button>
+    <div class="card-stack">
+      <div class="grid-2">
+        <div class="card">
+          <h2>手动测试</h2>
+          <div class="field-row">
+            <div class="field">
+              <span class="field-label">模式</span>
+              <select id="manualMode">
+                <option value="quick">快速（仅连接）</option>
+                <option value="standard" selected>标准（HLS+分片）</option>
+                <option value="full">完整（含 FFprobe）</option>
+              </select>
+            </div>
+            <div class="field" style="justify-content:flex-end">
+              <span class="field-label">&nbsp;</span>
+              <div class="row">
+                <button onclick="startTest()">开始测试全部</button>
+                <button class="secondary" onclick="loadAll()">刷新</button>
+              </div>
+            </div>
+          </div>
+          <p id="testMsg" class="muted" style="margin-top:12px">尚未开始测试</p>
+          <div class="progress"><i id="bar"></i></div>
         </div>
-        <p id="testMsg" class="muted">尚未开始测试</p>
-        <div class="progress"><i id="bar"></i></div>
+        <div class="card">
+          <h2>定时测试</h2>
+          <h3>基础设置</h3>
+          <div class="field-row">
+            <div class="field">
+              <span class="field-label">状态</span>
+              <select id="schEnabled">
+                <option value="true">启用</option>
+                <option value="false">停用</option>
+              </select>
+            </div>
+            <div class="field">
+              <span class="field-label">模式</span>
+              <select id="schMode">
+                <option value="quick">快速（仅连接）</option>
+                <option value="standard">标准（HLS+分片）</option>
+                <option value="full">完整（含 FFprobe）</option>
+              </select>
+            </div>
+            <div class="field">
+              <span class="field-label">间隔</span>
+              <div class="field-inline">
+                <input id="schInterval" type="number" min="1" max="10080" value="30">
+                <span class="muted">分钟</span>
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label">范围</span>
+              <select id="schScope">
+                <option value="enabled">所有启用源</option>
+                <option value="failed">仅失败源</option>
+                <option value="stale">超过指定时间未测试</option>
+              </select>
+            </div>
+            <div class="field" id="staleWrap">
+              <span class="field-label">未测试超过</span>
+              <div class="field-inline">
+                <input id="schStale" type="number" min="1" value="24">
+                <span class="muted">小时</span>
+              </div>
+            </div>
+          </div>
+          <hr class="divider-soft">
+          <h3>并发与超时</h3>
+          <div class="field-row">
+            <div class="field">
+              <span class="field-label">全局并发</span>
+              <input id="schConcurrency" type="number" min="1" max="200" value="20">
+            </div>
+            <div class="field">
+              <span class="field-label">单主机并发</span>
+              <input id="schHostConcurrency" type="number" min="1" max="50" value="5">
+            </div>
+            <div class="field">
+              <span class="field-label">连接超时</span>
+              <div class="field-inline">
+                <input id="schConnectTimeout" type="number" min="1" max="120" value="5">
+                <span class="muted">秒</span>
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label">读取超时</span>
+              <div class="field-inline">
+                <input id="schReadTimeout" type="number" min="1" max="300" value="10">
+                <span class="muted">秒</span>
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label">分片数</span>
+              <input id="schSegments" type="number" min="1" max="10" value="3">
+            </div>
+          </div>
+          <div class="row row-gap">
+            <button onclick="saveScheduler()">保存设置</button>
+            <button class="secondary" onclick="runScheduler()">立即执行</button>
+          </div>
+          <p id="schStatus" class="status-line">加载中…</p>
+          <p id="schMsg" class="muted"></p>
+        </div>
       </div>
       <div class="card">
-        <h2>定时测试</h2>
-        <div class="row">
-          <label>状态
-            <select id="schEnabled">
-              <option value="true">启用</option>
-              <option value="false">停用</option>
-            </select>
-          </label>
-          <label>模式
-            <select id="schMode">
-              <option value="quick">快速（仅连接）</option>
-              <option value="standard">标准（HLS+分片）</option>
-              <option value="full">完整（含 FFprobe）</option>
-            </select>
-          </label>
-          <label>间隔 <input id="schInterval" type="number" min="1" max="10080" value="30" style="width:80px"> 分钟</label>
-          <label>范围
-            <select id="schScope">
-              <option value="enabled">所有启用源</option>
-              <option value="failed">仅失败源</option>
-              <option value="stale">超过指定时间未测试</option>
-            </select>
-          </label>
-          <label id="staleWrap">未测试超过 <input id="schStale" type="number" min="1" value="24" style="width:70px"> 小时</label>
-        </div>
-        <div class="row row-gap">
-          <label>全局并发 <input id="schConcurrency" type="number" min="1" max="200" value="20" style="width:70px"></label>
-          <label>单主机并发 <input id="schHostConcurrency" type="number" min="1" max="50" value="5" style="width:60px"></label>
-          <label>连接超时 <input id="schConnectTimeout" type="number" min="1" max="120" value="5" style="width:60px"> 秒</label>
-          <label>读取超时 <input id="schReadTimeout" type="number" min="1" max="300" value="10" style="width:60px"> 秒</label>
-          <label>分片数 <input id="schSegments" type="number" min="1" max="10" value="3" style="width:60px"></label>
-        </div>
-        <div class="row row-gap">
-          <button onclick="saveScheduler()">保存设置</button>
-          <button class="secondary" onclick="runScheduler()">立即执行</button>
-        </div>
-        <p id="schStatus" class="muted">加载中…</p>
-        <p id="schMsg" class="muted"></p>
-        <div style="margin-top:12px">
-          <b>定时任务运行结果</b>
-          <button class="secondary" style="margin-left:10px" onclick="loadSchedulerRuns()">刷新结果</button>
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h2 style="margin:0">定时任务运行结果</h2>
+          <button class="secondary sm" onclick="loadSchedulerRuns()">刷新结果</button>
         </div>
         <div id="schRuns" class="scheduler-runs muted" style="margin-top:8px">加载中…</div>
       </div>
@@ -508,7 +605,7 @@ async function loadChannels(force = false) {
     if (next) next.disabled = _chOffset + _chLimit >= totalChannels;
 
     document.getElementById('channels').innerHTML = rows.length
-      ? `<div class="result-table-wrap"><table class="result-table"><thead><tr>
+      ? `<div class="result-table-wrap"><table class="result-table channels-table"><thead><tr>
           <th>频道</th><th>源 ID</th><th>结果</th><th>分辨率</th><th>评分</th>
           <th>速度</th><th>延迟</th><th>稳定性</th><th>错误</th>
         </tr></thead><tbody>${rows.join('')}</tbody></table></div>`
@@ -583,22 +680,25 @@ async function loadRemotePlaylists() {
       let status = labelMap(REMOTE_STATUS, x.last_status, x.last_status || '未知');
       if (x.last_status === 'failed' && fail)
         status += `（连续失败 ${fail}/${x.auto_delete_after_failures || 3}）`;
+      const url = x.url || '';
       return `<tr>
-        <td>${escapeHtml(x.name)}</td>
-        <td style="word-break:break-all">${escapeHtml(x.url)}</td>
-        <td>${x.enabled ? '启用' : '停用'}</td>
-        <td>${x.interval_minutes} 分钟</td>
+        <td class="col-name">${escapeHtml(x.name)}</td>
+        <td class="col-url"><span class="url-cell" title="${escapeHtml(url)}">${escapeHtml(url)}</span></td>
+        <td class="col-switch">${x.enabled ? '启用' : '停用'}</td>
+        <td class="col-interval">${x.interval_minutes} 分钟</td>
         <td>${x.last_fetched_at ? fmtTime(x.last_fetched_at) : '从未获取'}</td>
         <td>${escapeHtml(status)}${x.last_error ? '：' + escapeHtml(x.last_error) : ''}</td>
-        <td>新增 ${x.last_added || 0} / 跳过 ${x.last_skipped || 0}</td>
-        <td>
-          <button onclick="fetchRemote(${x.id})">立即获取</button>
-          <button class="secondary" onclick="toggleRemote(${x.id}, ${!x.enabled})">${x.enabled ? '停用' : '启用'}</button>
-          <button class="secondary" onclick="deleteRemote(${x.id})">删除</button>
+        <td class="col-stat">新增 ${x.last_added || 0} / 跳过 ${x.last_skipped || 0}</td>
+        <td class="col-ops">
+          <div class="btn-stack">
+            <button class="sm" onclick="fetchRemote(${x.id})">立即获取</button>
+            <button class="secondary sm" onclick="toggleRemote(${x.id}, ${!x.enabled})">${x.enabled ? '停用' : '启用'}</button>
+            <button class="secondary sm" onclick="deleteRemote(${x.id})">删除</button>
+          </div>
         </td>
       </tr>`;
     }).join('');
-    box.innerHTML = `<div class="result-table-wrap"><table class="result-table" style="min-width:900px"><thead><tr>
+    box.innerHTML = `<div class="result-table-wrap"><table class="data-table remote-table"><thead><tr>
       <th>名称</th><th>地址</th><th>开关</th><th>间隔</th><th>上次获取</th><th>结果</th><th>导入统计</th><th>操作</th>
     </tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (e) {
@@ -610,43 +710,50 @@ async function addRemote() {
   let name = document.getElementById('remoteName').value.trim();
   let url = document.getElementById('remoteUrl').value.trim();
   let interval = Number(document.getElementById('remoteInterval').value || 360);
-  if (!name || !url) return alert('请填写名称和订阅地址');
+  if (!name || !url) return msg('remoteMsg', '请填写名称和订阅地址', false);
   try {
+    msg('remoteMsg', '正在添加…');
     await req('/api/remote-playlists', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, url, interval_minutes: interval, enabled: true }),
     });
     document.getElementById('remoteName').value = '';
     document.getElementById('remoteUrl').value = '';
+    msg('remoteMsg', '已添加远程订阅');
     await loadRemotePlaylists();
-  } catch (e) { alert('添加失败：' + e.message); }
+  } catch (e) { msg('remoteMsg', '添加失败：' + e.message, false); }
 }
 async function fetchRemote(id) {
   try {
+    msg('remoteMsg', '正在获取远程订阅…');
     let d = await req('/api/remote-playlists/' + id + '/fetch', { method: 'POST' });
     if (d.auto_deleted) {
-      alert('远程订阅已自动删除：' + (d.reason || '地址失效或内容无效'));
+      msg('remoteMsg', '远程订阅已自动删除：' + (d.reason || '地址失效或内容无效'), false);
     } else {
-      alert(`获取完成：解析 ${d.entries || 0} 条，新增 ${d.added || 0} 条，跳过重复 ${d.skipped || 0} 条`);
+      msg('remoteMsg', `获取完成：解析 ${d.entries || 0} 条，新增 ${d.added || 0} 条，跳过重复 ${d.skipped || 0} 条`);
     }
     await loadAll();
-  } catch (e) { alert('获取失败：' + e.message); }
+  } catch (e) { msg('remoteMsg', '获取失败：' + e.message, false); }
 }
 async function toggleRemote(id, enabled) {
   try {
+    msg('remoteMsg', enabled ? '正在启用…' : '正在停用…');
     await req('/api/remote-playlists/' + id, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }),
     });
+    msg('remoteMsg', enabled ? '已启用该远程订阅' : '已停用该远程订阅');
     await loadRemotePlaylists();
-  } catch (e) { alert('操作失败：' + e.message); }
+  } catch (e) { msg('remoteMsg', '操作失败：' + e.message, false); }
 }
 async function deleteRemote(id) {
   if (!confirm('确定删除该远程订阅？已导入的频道和源不会被删除。')) return;
   try {
+    msg('remoteMsg', '正在删除…');
     await req('/api/remote-playlists/' + id, { method: 'DELETE' });
+    msg('remoteMsg', '已删除该远程订阅');
     await loadRemotePlaylists();
-  } catch (e) { alert('删除失败：' + e.message); }
+  } catch (e) { msg('remoteMsg', '删除失败：' + e.message, false); }
 }
 
 async function loadSchedulerRuns() {
@@ -657,7 +764,7 @@ async function loadSchedulerRuns() {
       return;
     }
     document.getElementById('schRuns').innerHTML = `
-      <div class="result-table-wrap"><table class="result-table" style="min-width:820px">
+      <div class="result-table-wrap"><table class="data-table sch-table">
         <thead><tr>
           <th>编号</th><th>触发</th><th>模式</th><th>范围</th><th>状态</th>
           <th>进度</th><th>通过/失败</th><th>开始时间</th><th>耗时</th>
@@ -669,7 +776,7 @@ async function loadSchedulerRuns() {
           let scope = labelMap(SCOPE_LABEL, r.source_scope, r.source_scope || '-');
           let dur = r.duration_seconds != null ? (Number(r.duration_seconds).toFixed(1) + ' 秒') : '-';
           return `<tr>
-            <td>#${r.id}</td>
+            <td class="col-id">#${r.id}</td>
             <td>${tr}</td>
             <td>${mode}</td>
             <td>${scope}</td>
