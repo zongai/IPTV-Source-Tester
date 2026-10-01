@@ -88,8 +88,26 @@ button.sm{padding:6px 10px;font-size:12px}
 .btn-danger:hover{background:#fef2f2;filter:none}
 .pill-on{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--ok-bg);color:var(--ok)}
 .pill-off{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:#e5e7eb;color:#4b5563}
-.sch-table .col-id{width:56px}
-.sch-table td{font-size:13px}
+.sch-table{table-layout:fixed;width:100%;min-width:0}
+.sch-table th,.sch-table td{padding:8px 8px;font-size:13px;vertical-align:middle}
+.sch-table .col-id{width:52px;font-weight:600;color:#4b5563}
+.sch-table .col-trigger{width:88px}
+.sch-table .col-mode{width:56px}
+.sch-table .col-scope{width:100px}
+.sch-table .col-status{width:80px;text-align:center}
+.sch-table .col-progress{width:120px}
+.sch-table .col-passfail{width:100px}
+.sch-table .col-time{width:148px;font-size:12px;color:#4b5563;white-space:nowrap}
+.sch-table .col-dur{width:88px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.sch-table .progress-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sch-table .progress-meta{font-size:12px;color:#4b5563;white-space:nowrap}
+.sch-table .progress-bar{height:4px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+.sch-table .progress-bar>i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.pass-fail{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pass-fail .ok{font-weight:600}
+.pass-fail .bad{font-weight:600}
+.badge-run{background:#dbeafe;color:#1d4ed8}
+.badge-cancel{background:#f3f4f6;color:#6b7280}
 #remoteMsg{min-height:1.4em;margin:8px 0 0}
 .remote-form .field-name{flex:0 1 140px}
 .remote-form .field-url{flex:1 1 260px}
@@ -963,6 +981,27 @@ async function deleteRemote(id) {
   } catch (e) { msg('remoteMsg', '删除失败：' + e.message, false); }
 }
 
+function fmtDuration(sec) {
+  if (sec == null || sec === '') return '-';
+  const n = Number(sec);
+  if (!Number.isFinite(n) || n < 0) return '-';
+  if (n < 60) return n.toFixed(n < 10 ? 1 : 0) + ' 秒';
+  const m = Math.floor(n / 60);
+  const s = Math.round(n % 60);
+  if (m < 60) return m + ' 分 ' + s + ' 秒';
+  const h = Math.floor(m / 60);
+  return h + ' 时 ' + (m % 60) + ' 分';
+}
+
+function runStatusBadge(status) {
+  const label = labelMap(RUN_STATUS, status, status || '-');
+  if (status === 'completed') return `<span class="badge badge-ok">${label}</span>`;
+  if (status === 'failed') return `<span class="badge badge-fail">${label}</span>`;
+  if (status === 'running') return `<span class="badge badge-run">${label}</span>`;
+  if (status === 'cancelled') return `<span class="badge badge-cancel">${label}</span>`;
+  return `<span class="badge badge-pending">${escapeHtml(label)}</span>`;
+}
+
 async function loadSchedulerRuns() {
   try {
     let rows = await req('/api/scheduler/runs?limit=20');
@@ -973,25 +1012,43 @@ async function loadSchedulerRuns() {
     document.getElementById('schRuns').innerHTML = `
       <div class="result-table-wrap"><table class="data-table sch-table">
         <thead><tr>
-          <th>编号</th><th>触发</th><th>模式</th><th>范围</th><th>状态</th>
-          <th>进度</th><th>通过/失败</th><th>开始时间</th><th>耗时</th>
+          <th class="col-id">编号</th>
+          <th class="col-trigger">触发</th>
+          <th class="col-mode">模式</th>
+          <th class="col-scope">范围</th>
+          <th class="col-status">状态</th>
+          <th class="col-progress">进度</th>
+          <th class="col-passfail">通过 / 失败</th>
+          <th class="col-time">开始时间</th>
+          <th class="col-dur">耗时</th>
         </tr></thead>
         <tbody>${rows.map(r => {
-          let st = labelMap(RUN_STATUS, r.status, r.status);
-          let tr = labelMap(RUN_TRIGGER, r.trigger, r.trigger || '-');
-          let mode = labelMap(MODE_LABEL, r.test_mode, r.test_mode || '-');
-          let scope = labelMap(SCOPE_LABEL, r.source_scope, r.source_scope || '-');
-          let dur = r.duration_seconds != null ? (Number(r.duration_seconds).toFixed(1) + ' 秒') : '-';
+          const tr = labelMap(RUN_TRIGGER, r.trigger, r.trigger || '-');
+          const mode = labelMap(MODE_LABEL, r.test_mode, r.test_mode || '-');
+          const scope = labelMap(SCOPE_LABEL, r.source_scope, r.source_scope || '-');
+          const tested = r.tested || 0;
+          const total = r.total || 0;
+          const pct = total > 0 ? Math.min(100, Math.round(tested / total * 100)) : 0;
+          const passed = r.passed || 0;
+          const failed = r.failed || 0;
+          const dur = r.status === 'running' && r.duration_seconds == null
+            ? '进行中'
+            : fmtDuration(r.duration_seconds);
           return `<tr>
             <td class="col-id">#${r.id}</td>
-            <td>${tr}</td>
-            <td>${mode}</td>
-            <td>${scope}</td>
-            <td>${st}</td>
-            <td>${r.tested || 0} / ${r.total || 0}</td>
-            <td>${r.passed || 0} / ${r.failed || 0}</td>
-            <td>${fmtTime(r.started_at)}</td>
-            <td>${dur}</td>
+            <td class="col-trigger">${tr}</td>
+            <td class="col-mode">${mode}</td>
+            <td class="col-scope">${scope}</td>
+            <td class="col-status">${runStatusBadge(r.status)}</td>
+            <td class="col-progress">
+              <div class="progress-cell">
+                <span class="progress-meta">${tested} / ${total}${total ? '（' + pct + '%）' : ''}</span>
+                <div class="progress-bar"><i style="width:${pct}%"></i></div>
+              </div>
+            </td>
+            <td class="col-passfail"><span class="pass-fail"><span class="ok">${passed}</span> / <span class="bad">${failed}</span></span></td>
+            <td class="col-time">${fmtTime(r.started_at)}</td>
+            <td class="col-dur">${dur}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
