@@ -53,30 +53,29 @@ def normalize_url(url: str) -> str:
 
 
 def normalize_channel_name(name: str) -> str:
-    s = _clean_text(name).casefold()
-    s = re.sub(r"[\s_]+", " ", s)
-    s = re.sub(r"\s*-\s*", "-", s)
-    s = s.replace("中央电视台", "cctv")
-    # CCTV5 and CCTV5+ are distinct channels. Keep the plus marker.
-    # Avoid \b after '+' (non-word); end-of-string would not match.
-    s = re.sub(r"cctv\s*-?\s*([0-9]+)\s*(?:\+|plus)(?!\w)", r"cctv-\1-plus", s)
-    s = re.sub(r"cctv\s*-?\s*([0-9]+)\s*综合", r"cctv-\1", s)
-    s = re.sub(r"cctv\s*-?\s*([0-9]+)(?!\w)", r"cctv-\1", s)
-    return re.sub(r"\s+", " ", s).strip().upper()
+    """Legacy helper: prefer matcher.resolve_channel for new code."""
+    from app.matcher.channel_matcher import resolve_channel
+
+    ident = resolve_channel(display_name=name)
+    # Keep uppercase CCTV-N style for older tests/callers.
+    m = __import__("re").fullmatch(r"cctv-(\d+)(-plus)?", ident.key)
+    if m:
+        base = f"CCTV-{m.group(1)}"
+        return base + ("+" if m.group(2) else "")
+    if ident.key == "cctv-4k":
+        return "CCTV-4K"
+    return (ident.display_name or name or "").upper()
 
 
 def infer_default_group(*names: str | None) -> str | None:
-    """Default group-title when M3U has none: CCTV → 央视频道, 卫视 → 卫视频道."""
+    """Rule-based group (央视 / 卫视 / 其他); does not use playlist group-title."""
+    from app.matcher.channel_matcher import resolve_channel
+
     for raw in names:
         text = _clean_text(raw)
         if not text:
             continue
-        # Prefer explicit CCTV / 中央电视台 markers over generic 卫视.
-        folded = text.casefold()
-        if "cctv" in folded or "中央电视台" in text:
-            return "央视频道"
-        if "卫视" in text:
-            return "卫视频道"
+        return resolve_channel(display_name=text).group
     return None
 
 

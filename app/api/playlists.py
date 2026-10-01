@@ -9,8 +9,7 @@ from app.database.database import SessionLocal
 from app.database.models import ChannelDB, SourceDB, TestResultDB
 from app.exporters.logo import resolve_tvg_logo
 from app.exporters.m3u import render_m3u
-from app.matcher.channel_matcher import channel_sort_key
-from app.parser.normalizer import infer_default_group
+from app.matcher.channel_matcher import channel_sort_key, rule_group_for_key
 from app.core.config import get_settings
 from app.utils.timeutil import to_iso
 
@@ -91,20 +90,15 @@ def payload(min_score=0.0, min_stability=0.0, min_height=0, min_speed=0.0):
             if (r.download_speed or 0) < min_speed:
                 continue
             logo = resolve_tvg_logo(c.display_name or c.id, c.tvg_logo)
-            # Prefer the source's own group-title; fall back to channel group, then defaults.
-            src_group = (
-                getattr(x, 'group_name', None)
-                or c.group_name
-                or infer_default_group(c.display_name, c.id)
-            )
-            ch_group = c.group_name or infer_default_group(c.display_name, c.id)
+            # Unified rule-based group (央视/卫视/其他), never playlist group-title.
+            ch_group = c.group_name or rule_group_for_key(c.id, c.display_name)
             bucket = grouped.setdefault(c.id, {
                 'id': c.id, 'name': c.display_name, 'logo': logo,
                 'group': ch_group, 'sources': [],
             })
             bucket['sources'].append({
                 'id': x.id, 'url': x.url,
-                'group': src_group,
+                'group': ch_group,
                 'user_agent': x.user_agent, 'referer': x.referer,
                 'origin': x.origin, 'cookie': x.cookie, 'authorization': x.authorization,
                 'resolution': r.height, 'bitrate': r.bitrate,
@@ -115,11 +109,16 @@ def payload(min_score=0.0, min_stability=0.0, min_height=0, min_speed=0.0):
         out = list(grouped.values())
         out.sort(key=lambda c: channel_sort_key(c['name']))
         for c in out:
-            c['sources'].sort(key=lambda z: (z['score'] or 0, z['stability'] or 0, z['speed'] or 0), reverse=True)
-            # Channel-level group: most common non-empty source group, else stored channel group.
-            groups = [s.get('group') for s in c['sources'] if s.get('group')]
-            if groups:
-                c['group'] = max(set(groups), key=groups.count)
+            # Backup lines: higher score / resolution first.
+            c['sources'].sort(
+                key=lambda z: (
+                    z['score'] or 0,
+                    z.get('resolution') or 0,
+                    z['stability'] or 0,
+                    z['speed'] or 0,
+                ),
+                reverse=True,
+            )
         return {'channels': out, 'channel_count': len(out), 'source_count': sum(len(c['sources']) for c in out)}
 
 
@@ -156,13 +155,7 @@ def _m3u_response(
                 headers['Cookie'] = source['cookie']
             if source.get('authorization'):
                 headers['Authorization'] = source['authorization']
-            # Per-source group-title so the same channel under different lists stays correct.
-            group_title = (
-                source.get('group')
-                or c.get('group')
-                or infer_default_group(c.get('name'), c.get('id'))
-                or ''
-            )
+            group_title = c.get('group') or rule_group_for_key(c.get('id') or '', c.get('name')) or ''
             entries.append({'name': c['name'], 'url': source['url'], 'attrs': {
                 'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'],
                 'group-title': group_title,

@@ -6,9 +6,8 @@ from sqlalchemy import delete, select
 
 from app.database.models import ChannelDB, SourceDB, TestResultDB
 from app.exporters.logo import is_broken_logo, resolve_tvg_logo
-from app.matcher.channel_matcher import channel_id_for
+from app.matcher.channel_matcher import resolve_channel
 from app.parser.normalizer import (
-    infer_default_group,
     normalize_header,
     normalize_url,
     source_identity_key,
@@ -150,12 +149,14 @@ def import_entries(session, entries, playlist_name=None):
             skipped += 1
             continue
 
-        cid = channel_id_for(tvg_id=e.tvg_id, tvg_name=e.tvg_name, display_name=e.name)
-        display = e.name or e.tvg_name
+        # Canonical key / dictionary display / rule group — not playlist labels.
+        ident = resolve_channel(
+            tvg_id=e.tvg_id, tvg_name=e.tvg_name, display_name=e.name
+        )
+        cid = ident.key
+        display = ident.display_name
+        rule_group = ident.group
         logo = resolve_tvg_logo(display or cid, e.tvg_logo)
-        entry_group = (e.group or "").strip() or None
-        if not entry_group:
-            entry_group = infer_default_group(e.name, e.tvg_name, cid)
         c = session.get(ChannelDB, cid)
         if not c:
             c = ChannelDB(
@@ -164,7 +165,7 @@ def import_entries(session, entries, playlist_name=None):
                 display_name=display,
                 tvg_id=e.tvg_id,
                 tvg_logo=logo,
-                group_name=entry_group,
+                group_name=rule_group,
                 language=e.tvg_language,
                 country=e.tvg_country,
                 aliases_json=json.dumps([], ensure_ascii=False),
@@ -172,16 +173,13 @@ def import_entries(session, entries, playlist_name=None):
             session.add(c)
             session.flush()
         else:
-            if e.tvg_name or e.name:
-                c.display_name = display
+            # Always refresh to dictionary name + rule group (stable, not source-driven).
+            c.display_name = display
+            c.group_name = rule_group
             if e.tvg_id:
                 c.tvg_id = e.tvg_id
             if logo and (not c.tvg_logo or is_broken_logo(c.tvg_logo) or e.tvg_logo):
                 c.tvg_logo = logo
-            # Do not overwrite channel group with every playlist entry — the same
-            # channel (e.g. CCTV-1) often appears under many group-titles.
-            if entry_group and not (c.group_name or "").strip():
-                c.group_name = entry_group
             if e.tvg_language:
                 c.language = e.tvg_language
             if e.tvg_country:
@@ -205,7 +203,8 @@ def import_entries(session, entries, playlist_name=None):
             url=normalized,
             normalized_url=normalized,
             source_playlist=playlist_name,
-            group_name=entry_group,
+            # Export grouping uses channel rules; keep same on source for consistency.
+            group_name=rule_group,
             user_agent=hdrs["user_agent"],
             referer=hdrs["referer"],
             origin=hdrs["origin"],

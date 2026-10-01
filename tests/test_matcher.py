@@ -1,32 +1,84 @@
-from app.matcher.channel_matcher import channel_id_for
+from app.matcher.channel_matcher import (
+    channel_id_for,
+    channel_sort_key,
+    resolve_channel,
+    GROUP_CCTV,
+    GROUP_SAT,
+    GROUP_OTHER,
+)
 
-def test_cctv_aliases_converge():
-    assert channel_id_for(tvg_id=None, tvg_name="CCTV1", display_name="") == "cctv-1"
-    assert channel_id_for(tvg_id=None, tvg_name="中央电视台1", display_name="") == "cctv-1"
+
+def test_cctv1_variants_same_key():
+    variants = [
+        "cctv1",
+        "cctv-1",
+        "CCTV1",
+        "CCTV1-综合",
+        "CCTV1-综合HD",
+        "CCTV-1 综合",
+        "中央电视台1",
+    ]
+    keys = {channel_id_for(display_name=v) for v in variants}
+    assert keys == {"cctv-1"}
+    for v in variants:
+        ident = resolve_channel(display_name=v)
+        assert ident.group == GROUP_CCTV
+        assert ident.display_name == "CCTV-1 综合"
+
+
+def test_cctv10_not_merged_with_cctv1():
+    for v in ["CCTV10-科教", "CCTV10-科教HD", "CCTV10", "cctv10", "cctv-10"]:
+        assert channel_id_for(display_name=v) == "cctv-10"
+    assert channel_id_for(display_name="CCTV1") == "cctv-1"
+
+
+def test_cctv5_and_plus_distinct():
+    assert channel_id_for(display_name="CCTV5") == "cctv-5"
+    assert channel_id_for(display_name="CCTV5+") == "cctv-5-plus"
+    assert channel_id_for(display_name="CCTV-5+") == "cctv-5-plus"
+
+
+def test_cctv_4k_independent():
+    assert channel_id_for(display_name="CCTV-4K") == "cctv-4k"
+    assert channel_id_for(display_name="CCTV4K") == "cctv-4k"
+    assert channel_id_for(display_name="CCTV4") == "cctv-4"
+
+
+def test_satellite_group_and_name():
+    ident = resolve_channel(display_name="湖南卫视HD")
+    assert ident.key == "湖南卫视"
+    assert ident.display_name == "湖南卫视"
+    assert ident.group == GROUP_SAT
+
+
+def test_beijing_weishi_4k_is_weishi_not_4k_key():
+    # 4K is quality for 卫视, not a separate key
+    assert channel_id_for(display_name="北京卫视4K") == "北京卫视"
+
 
 def test_unknown_channel_stays_separate():
-    assert channel_id_for(tvg_id=None, tvg_name="Some Channel", display_name="") == "some-channel"
+    assert channel_id_for(tvg_name="Some Channel", display_name="") == "somechannel"
 
 
-def test_cctv5_and_cctv5_plus_are_distinct():
-    assert channel_id_for(tvg_name='CCTV5', display_name='') == 'cctv-5'
-    assert channel_id_for(tvg_name='CCTV5+', display_name='') == 'cctv-5-plus'
-    assert channel_id_for(tvg_name='CCTV-5+', display_name='') == 'cctv-5-plus'
+def test_sort_numeric():
+    names = ["CCTV10", "CCTV5+", "CCTV2", "CCTV1", "CCTV5"]
+    assert sorted(names, key=channel_sort_key) == [
+        "CCTV1",
+        "CCTV2",
+        "CCTV5",
+        "CCTV5+",
+        "CCTV10",
+    ]
 
 
-def test_cctv_sort_is_numeric_and_plus_is_distinct():
-    from app.matcher.channel_matcher import channel_sort_key
-    names = ['CCTV10', 'CCTV5+', 'CCTV2', 'CCTV1', 'CCTV5']
-    assert sorted(names, key=channel_sort_key) == ['CCTV1', 'CCTV2', 'CCTV5', 'CCTV5+', 'CCTV10']
+def test_tvg_id_not_merge_unrelated():
+    a = channel_id_for(tvg_id="1", tvg_name="北京卫视", display_name="北京卫视")
+    b = channel_id_for(tvg_id="1", tvg_name="CCTV5", display_name="CCTV5")
+    assert a != b
+    assert a == "北京卫视"
+    assert b == "cctv-5"
 
 
-def test_repeated_numeric_tvg_id_does_not_merge_named_channels():
-    # tvg-id values are often reused (1, 2, 3...) across unrelated channels.
-    assert channel_id_for(tvg_id="1", tvg_name="北京卫视4K", display_name="北京卫视4K") == "北京卫视4k"
-    assert channel_id_for(tvg_id="1", tvg_name="IPTV法治", display_name="IPTV法治") == "iptv法治"
-    assert channel_id_for(tvg_id="1", tvg_name="CCTV5", display_name="CCTV5") == "cctv-5"
-
-
-def test_tvg_id_is_last_resort_only():
-    assert channel_id_for(tvg_id="1", tvg_name="", display_name="CCTV5+") == "cctv-5-plus"
-    assert channel_id_for(tvg_id="1", tvg_name="", display_name="") == "1"
+def test_other_group():
+    ident = resolve_channel(display_name="某地方新闻HD")
+    assert ident.group == GROUP_OTHER
