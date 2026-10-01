@@ -17,12 +17,13 @@ _QUALITY_SUFFIX_RE = re.compile(
     r"[\s_\-]*(?:HD|SD|FHD|UHD|4K|8K|高清|超清|超高清|标清|频道)$",
     re.IGNORECASE,
 )
+# Allow optional program suffix (综合/科教/...) after the number.
 _CCTV_RE = re.compile(
-    r"^CCTV[\s\-_]*(\d+)(?:[\s\-_]*(\+|plus))?$",
+    r"^CCTV[\s\-_]*(\d+)(?:[\s\-_]*(\+|plus))?(?:[\s\-_].*)?$",
     re.IGNORECASE,
 )
 _CCTV_SLUG_RE = re.compile(
-    r"^cctv[\s\-_]*(\d+)(?:[\s\-_]*(plus))?$",
+    r"^cctv[\s\-_]*(\d+)(?:[\s\-_]*(plus))?(?:[\s\-_].*)?$",
     re.IGNORECASE,
 )
 
@@ -68,6 +69,15 @@ def logo_filename_candidates(channel_name: str | None) -> list[str]:
     cleaned = _QUALITY_SUFFIX_RE.sub("", raw).strip()
     if cleaned and cleaned not in fallback:
         fallback.append(cleaned)
+    # Drop CCTV program labels so "CCTV-10 科教" → still maps to CCTV10.png
+    prog = re.sub(
+        r"^(CCTV[\s\-_]*\d+(?:[\s\-_]*(?:\+|plus))?)[\s\-_]*(?:综合|财经|综艺|中文国际|体育|电影|国防军事|电视剧|纪录|科教|戏曲|社会与法|新闻|少儿|音乐|奥林匹克|农业农村).*$",
+        r"\1",
+        cleaned or raw,
+        flags=re.IGNORECASE,
+    )
+    if prog and prog not in fallback:
+        fallback.append(prog.strip())
 
     def _add_cctv(base: str) -> None:
         m = _CCTV_RE.match(base) or _CCTV_SLUG_RE.match(base)
