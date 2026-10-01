@@ -65,6 +65,21 @@ def normalize_channel_name(name: str) -> str:
     return re.sub(r"\s+", " ", s).strip().upper()
 
 
+def infer_default_group(*names: str | None) -> str | None:
+    """Default group-title when M3U has none: CCTV → 央视频道, 卫视 → 卫视频道."""
+    for raw in names:
+        text = _clean_text(raw)
+        if not text:
+            continue
+        # Prefer explicit CCTV / 中央电视台 markers over generic 卫视.
+        folded = text.casefold()
+        if "cctv" in folded or "中央电视台" in text:
+            return "央视频道"
+        if "卫视" in text:
+            return "卫视频道"
+    return None
+
+
 def source_identity_key(
     normalized_url: str,
     user_agent: str | None = None,

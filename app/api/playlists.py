@@ -10,6 +10,7 @@ from app.database.models import ChannelDB, SourceDB, TestResultDB
 from app.exporters.logo import resolve_tvg_logo
 from app.exporters.m3u import render_m3u
 from app.matcher.channel_matcher import channel_sort_key
+from app.parser.normalizer import infer_default_group
 from app.core.config import get_settings
 
 router = APIRouter()
@@ -89,11 +90,16 @@ def payload(min_score=0.0, min_stability=0.0, min_height=0, min_speed=0.0):
             if (r.download_speed or 0) < min_speed:
                 continue
             logo = resolve_tvg_logo(c.display_name or c.id, c.tvg_logo)
-            # Prefer the source's own group-title; fall back to channel group.
-            src_group = (getattr(x, 'group_name', None) or c.group_name or '') or None
+            # Prefer the source's own group-title; fall back to channel group, then defaults.
+            src_group = (
+                getattr(x, 'group_name', None)
+                or c.group_name
+                or infer_default_group(c.display_name, c.id)
+            )
+            ch_group = c.group_name or infer_default_group(c.display_name, c.id)
             bucket = grouped.setdefault(c.id, {
                 'id': c.id, 'name': c.display_name, 'logo': logo,
-                'group': c.group_name, 'sources': [],
+                'group': ch_group, 'sources': [],
             })
             bucket['sources'].append({
                 'id': x.id, 'url': x.url,
@@ -150,7 +156,12 @@ def _m3u_response(
             if source.get('authorization'):
                 headers['Authorization'] = source['authorization']
             # Per-source group-title so the same channel under different lists stays correct.
-            group_title = source.get('group') or c.get('group') or ''
+            group_title = (
+                source.get('group')
+                or c.get('group')
+                or infer_default_group(c.get('name'), c.get('id'))
+                or ''
+            )
             entries.append({'name': c['name'], 'url': source['url'], 'attrs': {
                 'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'],
                 'group-title': group_title,

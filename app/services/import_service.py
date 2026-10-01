@@ -7,7 +7,12 @@ from sqlalchemy import delete, select
 from app.database.models import ChannelDB, SourceDB, TestResultDB
 from app.exporters.logo import is_broken_logo, resolve_tvg_logo
 from app.matcher.channel_matcher import channel_id_for
-from app.parser.normalizer import normalize_header, normalize_url, source_identity_key
+from app.parser.normalizer import (
+    infer_default_group,
+    normalize_header,
+    normalize_url,
+    source_identity_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +154,8 @@ def import_entries(session, entries, playlist_name=None):
         display = e.name or e.tvg_name
         logo = resolve_tvg_logo(display or cid, e.tvg_logo)
         entry_group = (e.group or "").strip() or None
+        if not entry_group:
+            entry_group = infer_default_group(e.name, e.tvg_name, cid)
         c = session.get(ChannelDB, cid)
         if not c:
             c = ChannelDB(
