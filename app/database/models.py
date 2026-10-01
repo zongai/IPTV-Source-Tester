@@ -76,14 +76,19 @@ class SchedulerConfigDB(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    # Lightweight default: standard mode on stale sources only.
     test_mode: Mapped[str] = mapped_column(String(16), default="standard")
-    source_scope: Mapped[str] = mapped_column(String(16), default="enabled")
+    source_scope: Mapped[str] = mapped_column(String(16), default="stale")
     stale_hours: Mapped[int] = mapped_column(Integer, default=24)
     max_concurrency: Mapped[int] = mapped_column(Integer, default=20)
-    max_host_concurrency: Mapped[int] = mapped_column(Integer, default=5)
+    # One in-flight test per host (domain queue).
+    max_host_concurrency: Mapped[int] = mapped_column(Integer, default=1)
     connect_timeout: Mapped[int] = mapped_column(Integer, default=5)
     read_timeout: Mapped[int] = mapped_column(Integer, default=10)
-    segment_test_count: Mapped[int] = mapped_column(Integer, default=3)
+    segment_test_count: Mapped[int] = mapped_column(Integer, default=2)
+    # Separate low-frequency full (FFprobe) schedule.
+    full_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    full_interval_hours: Mapped[int] = mapped_column(Integer, default=24)
     last_started_at: Mapped[datetime | None] = mapped_column(DateTime)
     last_finished_at: Mapped[datetime | None] = mapped_column(DateTime)
     last_status: Mapped[str] = mapped_column(String(32), default="never")

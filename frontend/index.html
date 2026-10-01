@@ -386,7 +386,7 @@ button.sm{padding:6px 10px;font-size:12px}
               <select id="schScope">
                 <option value="enabled">所有启用源</option>
                 <option value="failed">仅失败源</option>
-                <option value="stale">超过指定时间未测试</option>
+                <option value="stale" selected>超过指定时间未测试</option>
               </select>
             </div>
             <div class="field" id="staleWrap">
@@ -406,7 +406,7 @@ button.sm{padding:6px 10px;font-size:12px}
             </div>
             <div class="field">
               <span class="field-label">单主机并发</span>
-              <input id="schHostConcurrency" type="number" min="1" max="50" value="5">
+              <input id="schHostConcurrency" type="number" min="1" max="50" value="1">
             </div>
             <div class="field">
               <span class="field-label">连接超时</span>
@@ -424,10 +424,29 @@ button.sm{padding:6px 10px;font-size:12px}
             </div>
             <div class="field">
               <span class="field-label">分片数</span>
-              <input id="schSegments" type="number" min="1" max="10" value="3">
+              <input id="schSegments" type="number" min="1" max="10" value="2">
             </div>
           </div>
           <div class="row row-gap">
+            
+            <div class="field-row" style="margin-top:8px">
+              <div class="field">
+                <span class="field-label">完整模式定时（FFprobe）</span>
+                <select id="schFullEnabled">
+                  <option value="false" selected>关闭</option>
+                  <option value="true">启用</option>
+                </select>
+              </div>
+              <div class="field">
+                <span class="field-label">完整模式间隔</span>
+                <div class="field-inline">
+                  <input id="schFullInterval" type="number" min="1" max="168" value="24">
+                  <span class="muted">小时</span>
+                </div>
+              </div>
+            </div>
+            <p class="hint">日常定时默认「标准 + 仅超时未测」；完整模式单独低频调度，降低对源站压力。</p>
+
             <button onclick="saveScheduler()">保存设置</button>
             <button class="secondary" onclick="runScheduler()">立即执行</button>
           </div>
@@ -1101,7 +1120,9 @@ async function loadScheduler() {
     setVal('schHostConcurrency', d.max_host_concurrency || 5);
     setVal('schConnectTimeout', d.connect_timeout || 5);
     setVal('schReadTimeout', d.read_timeout || 10);
-    setVal('schSegments', d.segment_test_count || 3);
+    setVal('schSegments', d.segment_test_count || 2);
+    setVal('schFullEnabled', String(!!d.full_enabled));
+    setVal('schFullInterval', d.full_interval_hours || 24);
     fillSchedulerStatus(d);
     await loadSchedulerRuns();
   } catch (e) {
@@ -1123,7 +1144,9 @@ async function saveScheduler() {
         max_host_concurrency: Number(v('schHostConcurrency', 5)),
         connect_timeout: Number(v('schConnectTimeout', 5)),
         read_timeout: Number(v('schReadTimeout', 10)),
-        segment_test_count: Number(v('schSegments', 3)),
+        segment_test_count: Number(v('schSegments', 2)),
+        full_enabled: v('schFullEnabled', 'false') === 'true',
+        full_interval_hours: Number(v('schFullInterval', 24)),
       }),
     });
     msg('schMsg', '定时任务设置已保存');

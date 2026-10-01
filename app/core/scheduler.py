@@ -26,10 +26,12 @@ class SchedulerService:
         cols = {row[1] for row in session.execute(text('PRAGMA table_info(scheduler_config)'))}
         additions = {
             'max_concurrency': 'INTEGER DEFAULT 20',
-            'max_host_concurrency': 'INTEGER DEFAULT 5',
+            'max_host_concurrency': 'INTEGER DEFAULT 1',
             'connect_timeout': 'INTEGER DEFAULT 5',
             'read_timeout': 'INTEGER DEFAULT 10',
-            'segment_test_count': 'INTEGER DEFAULT 3',
+            'segment_test_count': 'INTEGER DEFAULT 2',
+            'full_enabled': 'INTEGER DEFAULT 0',
+            'full_interval_hours': 'INTEGER DEFAULT 24',
         }
         for name, definition in additions.items():
             if name not in cols:
@@ -43,12 +45,15 @@ class SchedulerService:
             s = get_settings()
             cfg = SchedulerConfigDB(
                 id=1, enabled=True, interval_minutes=s.test_interval_minutes,
-                test_mode="standard", source_scope="enabled", stale_hours=24,
+                # Lightweight: standard mode on stale sources only.
+                test_mode="standard", source_scope="stale", stale_hours=24,
                 max_concurrency=min(max(1, s.max_concurrency), 20),
-                max_host_concurrency=max(1, s.max_host_concurrency),
+                max_host_concurrency=max(1, min(s.max_host_concurrency, 1)),
                 connect_timeout=max(1, int(s.connect_timeout)),
                 read_timeout=max(1, int(s.read_timeout)),
-                segment_test_count=max(1, s.segment_test_count),
+                segment_test_count=max(1, min(s.segment_test_count, 2)),
+                full_enabled=bool(s.full_test_enabled),
+                full_interval_hours=max(1, int(s.full_test_interval_hours)),
             )
             session.add(cfg)
             session.commit()
@@ -63,6 +68,9 @@ class SchedulerService:
         if enabled:
             self._schedule(interval)
         with SessionLocal() as session:
+            cfg2 = self._config(session)
+            full_on = bool(getattr(cfg2, 'full_enabled', False))
+            full_hours = max(1, int(getattr(cfg2, 'full_interval_hours', 24) or 24))
             remote_playlists = list(session.scalars(select(RemotePlaylistDB)).all())
         for playlist in remote_playlists:
             self.schedule_remote_playlist(playlist.id, playlist.interval_minutes, playlist.enabled)
@@ -77,6 +85,7 @@ class SchedulerService:
             coalesce=True,
         )
         self.scheduler.start()
+        self._schedule_full(full_on, full_hours)
 
     async def _cleanup_history(self):
         from app.database.maintenance import cleanup_old_test_results
@@ -89,6 +98,39 @@ class SchedulerService:
             self._schedule_run, 'interval', minutes=max(1, int(minutes)), id=self.job_id,
             replace_existing=True, max_instances=1, coalesce=True,
         )
+
+    full_job_id = "iptv-periodic-full"
+
+    def _schedule_full(self, enabled: bool, hours: int):
+        if not self.scheduler.running and not enabled:
+            # scheduler not started yet; start() will call again after start
+            pass
+        if not enabled:
+            if self.scheduler.running and self.scheduler.get_job(self.full_job_id):
+                self.scheduler.remove_job(self.full_job_id)
+            return
+        self.scheduler.add_job(
+            self._schedule_full_run,
+            'interval',
+            hours=max(1, int(hours)),
+            id=self.full_job_id,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    async def _schedule_full_run(self):
+        if self._running_job and not self._running_job.done():
+            return
+        self._running_job = asyncio.create_task(
+            self.run_now(trigger="scheduled_full", mode_override="full", scope_override="stale")
+        )
+        try:
+            await self._running_job
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._running_job = None
 
     def _remote_job_id(self, playlist_id: int) -> str:
         return f"iptv-remote-playlist-{playlist_id}"
@@ -151,13 +193,13 @@ class SchedulerService:
         finally:
             self._running_job = None
 
-    async def run_now(self, trigger: str = "manual"):
+    async def run_now(self, trigger: str = "manual", mode_override: str | None = None, scope_override: str | None = None):
         if self._run_lock.locked():
             return {'status': 'already_running'}
         async with self._run_lock:
-            return await self._run_now_locked(trigger=trigger)
+            return await self._run_now_locked(trigger=trigger, mode_override=mode_override, scope_override=scope_override)
 
-    async def _run_now_locked(self, trigger: str = "manual"):
+    async def _run_now_locked(self, trigger: str = "manual", mode_override: str | None = None, scope_override: str | None = None):
         started_at = datetime.utcnow()
         with SessionLocal() as session:
             cfg = self._config(session)
@@ -165,9 +207,10 @@ class SchedulerService:
             cfg.last_status = 'running'
             session.commit()
             sources = list(session.scalars(select(SourceDB).where(SourceDB.enabled.is_(True))))
-            if cfg.source_scope == 'failed':
+            scope = scope_override or cfg.source_scope
+            if scope == 'failed':
                 sources = [x for x in sources if x.status != 'active']
-            elif cfg.source_scope == 'stale':
+            elif scope == 'stale':
                 cutoff = datetime.utcnow() - timedelta(hours=max(1, cfg.stale_hours))
                 filtered = []
                 for src in sources:
@@ -180,17 +223,18 @@ class SchedulerService:
                     if latest is None or latest < cutoff:
                         filtered.append(src)
                 sources = filtered
-            mode = cfg.test_mode
+            mode = mode_override or cfg.test_mode
             max_concurrency = cfg.max_concurrency
             max_host_concurrency = cfg.max_host_concurrency
             connect_timeout = cfg.connect_timeout
             read_timeout = cfg.read_timeout
             segment_test_count = cfg.segment_test_count
+            run_scope = scope
 
         with SessionLocal() as session:
             run = SchedulerRunDB(
                 started_at=started_at, status="running", trigger=trigger,
-                test_mode=mode, source_scope=cfg.source_scope, total=len(sources),
+                test_mode=mode, source_scope=run_scope, total=len(sources),
                 tested=0, passed=0, failed=0,
             )
             session.add(run)
@@ -205,12 +249,15 @@ class SchedulerService:
                 session.execute(delete(SchedulerRunDB).where(SchedulerRunDB.id.in_(old_ids)))
                 session.commit()
 
+        s = get_settings()
         runner = TestRunner(
             max_concurrency=max_concurrency,
             max_host_concurrency=max_host_concurrency,
+            ffprobe_concurrency=s.ffprobe_concurrency,
             connect_timeout=connect_timeout,
             read_timeout=read_timeout,
             segment_test_count=segment_test_count,
+            host_cooldown_seconds=s.host_cooldown_seconds,
         )
         saved = failed = 0
         fields = (
@@ -300,6 +347,7 @@ class SchedulerService:
         with SessionLocal() as session:
             cfg = self._config(session)
             job = self.scheduler.get_job(self.job_id) if self.scheduler.running else None
+            full_job = self.scheduler.get_job(self.full_job_id) if self.scheduler.running else None
             return {
                 'enabled': cfg.enabled, 'interval_minutes': cfg.interval_minutes,
                 'test_mode': cfg.test_mode, 'source_scope': cfg.source_scope,
@@ -307,10 +355,13 @@ class SchedulerService:
                 'max_concurrency': cfg.max_concurrency, 'max_host_concurrency': cfg.max_host_concurrency,
                 'connect_timeout': cfg.connect_timeout, 'read_timeout': cfg.read_timeout,
                 'segment_test_count': cfg.segment_test_count,
+                'full_enabled': bool(getattr(cfg, 'full_enabled', False)),
+                'full_interval_hours': int(getattr(cfg, 'full_interval_hours', 24) or 24),
                 'last_started_at': cfg.last_started_at,
                 'last_finished_at': cfg.last_finished_at, 'last_status': cfg.last_status,
                 'last_tested': cfg.last_tested, 'last_failed': cfg.last_failed,
                 'next_run_at': job.next_run_time if job else None,
+                'next_full_run_at': full_job.next_run_time if full_job else None,
                 'running': self._run_lock.locked(),
             }
 
@@ -327,6 +378,11 @@ class SchedulerService:
                     self._schedule(cfg.interval_minutes)
             elif self.scheduler.running and self.scheduler.get_job(self.job_id):
                 self.scheduler.remove_job(self.job_id)
+            if self.scheduler.running:
+                self._schedule_full(
+                    bool(getattr(cfg, 'full_enabled', False)),
+                    int(getattr(cfg, 'full_interval_hours', 24) or 24),
+                )
         return self.status()
 
 
