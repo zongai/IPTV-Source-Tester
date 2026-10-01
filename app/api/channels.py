@@ -104,7 +104,7 @@ def channels(
             bucket["sources"] = len(bucket["results"])
 
         out = list(by_channel.values())
-        out.sort(key=lambda c: channel_sort_key(c["name"] or ""))
+        out.sort(key=lambda c: channel_sort_key(c.get("id") or c.get("name") or ""))
 
         # Flatten for total count, then paginate at channel level.
         total_channels = len(out)

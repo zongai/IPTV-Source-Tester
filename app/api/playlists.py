@@ -107,7 +107,7 @@ def payload(min_score=0.0, min_stability=0.0, min_height=0, min_speed=0.0):
                 'tested_at': to_iso(r.tested_at),
             })
         out = list(grouped.values())
-        out.sort(key=lambda c: channel_sort_key(c['name']))
+        out.sort(key=lambda c: channel_sort_key(c.get('id') or c.get('name') or ''))
         for c in out:
             # Backup lines: higher score / resolution first.
             c['sources'].sort(
@@ -160,10 +160,11 @@ def _m3u_response(
                 'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'],
                 'group-title': group_title,
             }, 'headers': headers})
-    # Group then channel name — players show folders by group-title order of first appearance.
+    # Group (央视/卫视/其他) then CCTV numeric order — not lexicographic name.
+    _gorder = {'央视': 0, '卫视': 1, '其他': 2}
     entries.sort(key=lambda e: (
-        (e.get('attrs') or {}).get('group-title') or '',
-        e.get('name') or '',
+        _gorder.get((e.get('attrs') or {}).get('group-title') or '', 9),
+        channel_sort_key((e.get('attrs') or {}).get('tvg-id') or e.get('name') or ''),
     ))
     resp_headers = {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',

@@ -243,14 +243,33 @@ def aliases_for(channel_id: str) -> set:
     return DEFAULT_ALIASES.get(channel_id, set())
 
 
-def channel_sort_key(name: str):
-    """Sort CCTV by number; plus after base; then satellites; then others."""
-    ident = resolve_channel(display_name=name)
+_GROUP_SORT = {GROUP_CCTV: 0, GROUP_SAT: 1, GROUP_OTHER: 2}
+
+
+def channel_sort_key(name_or_id: str | None):
+    """Stable sort: 央视 by CCTV number, then 卫视, then others.
+
+    Accepts display names (CCTV-3 综艺) or canonical ids (cctv-3).
+    CCTV-1, CCTV-2, … CCTV-10 ordered by integer, not lexicographic text.
+    """
+    text = (name_or_id or "").strip()
+    if not text:
+        return (9, 9999, 0, "")
+
+    # Prefer parsing as canonical key first (channel id).
+    key_l = text.casefold()
+    m = re.fullmatch(r"cctv-(\d+)(-plus)?", key_l)
+    if m:
+        return (0, int(m.group(1)), 1 if m.group(2) else 0, key_l)
+    if key_l == "cctv-4k":
+        return (0, 4, 2, key_l)
+
+    ident = resolve_channel(display_name=text)
     m = re.fullmatch(r"cctv-(\d+)(-plus)?", ident.key)
     if m:
         return (0, int(m.group(1)), 1 if m.group(2) else 0, ident.key)
     if ident.key == "cctv-4k":
-        return (0, 4, 2, ident.key)  # after CCTV-4, before CCTV-5
-    if ident.group == GROUP_SAT:
-        return (1, ident.display_name)
-    return (2, ident.display_name or name or "")
+        return (0, 4, 2, ident.key)
+    g = _GROUP_SORT.get(ident.group, 2)
+    label = ident.display_name or text
+    return (g, 0, 0, label)

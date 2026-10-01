@@ -61,14 +61,21 @@ def test_unknown_channel_stays_separate():
 
 
 def test_sort_numeric():
-    names = ["CCTV10", "CCTV5+", "CCTV2", "CCTV1", "CCTV5"]
+    names = ["CCTV10", "CCTV5+", "CCTV2", "CCTV1", "CCTV5", "CCTV-3 综艺", "CCTV-13 新闻"]
     assert sorted(names, key=channel_sort_key) == [
         "CCTV1",
         "CCTV2",
+        "CCTV-3 综艺",
         "CCTV5",
         "CCTV5+",
         "CCTV10",
+        "CCTV-13 新闻",
     ]
+
+
+def test_sort_by_canonical_id():
+    ids = ["cctv-10", "cctv-2", "cctv-1", "cctv-5-plus"]
+    assert sorted(ids, key=channel_sort_key) == ["cctv-1", "cctv-2", "cctv-5-plus", "cctv-10"]
 
 
 def test_tvg_id_not_merge_unrelated():
