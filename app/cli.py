@@ -13,7 +13,6 @@ from app.database.models import ChannelDB, SourceDB, TestResultDB
 from app.database.repository import maybe_auto_delete_failed_source, retain_ffprobe_media_fields
 from app.exporters.m3u import render_m3u
 from app.parser.m3u import parse_m3u
-from app.parser.normalizer import infer_default_group
 from app.services.import_service import import_entries
 from app.services.test_service import TestRunner
 
@@ -86,12 +85,7 @@ def export(format: str = 'm3u', output: str = ''):
         for c in data['channels']:
             for source in c['sources']:
                 headers = {k: source[k] for k in ('user_agent','referer','origin','cookie','authorization') if source.get(k)}
-                group_title = (
-                    source.get('group')
-                    or c.get('group')
-                    or infer_default_group(c.get('name'), c.get('id'))
-                    or ''
-                )
+                group_title = source.get('group') or c.get('group') or ''
                 entries.append({'name': c['name'], 'url': source['url'], 'attrs': {
                     'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'],
                     'group-title': group_title,
