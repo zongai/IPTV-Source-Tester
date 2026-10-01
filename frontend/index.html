@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f4f6">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>IPTV Source Tester V4</title>
 <style>
 
@@ -100,16 +102,108 @@ button.sm{padding:6px 10px;font-size:12px}
 #netResult{white-space:pre-wrap;background:#f9fafb;padding:12px;border-radius:8px;overflow:auto;border:1px solid var(--border);margin:10px 0 0;font-size:12px}
 .footer{padding:8px 0 28px;text-align:center;color:var(--muted);font-size:12px}.deploy-hint{margin-top:6px;font-size:11px;line-height:1.5;color:#9ca3af;max-width:720px;margin-left:auto;margin-right:auto}
 .version-badge{display:inline-block;padding:2px 8px;margin-left:4px;background:#eef2ff;color:#3730a3;border-radius:999px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+/* 平板及以下 */
 @media(max-width:960px){
-  main{padding:14px}
+  main{padding:14px 14px 28px}
   .grid-2,.grid-import{grid-template-columns:1fr}
   .stats{grid-template-columns:repeat(2,1fr)}
-  input[type=url],input[type=text]{min-width:140px}
-  .result-table-wrap{max-height:65vh}
-  .result-table{min-width:900px}
-  .data-table{min-width:640px}
-  .url-cell{max-width:180px}
+  input[type=url],input[type=text]{min-width:0;width:100%}
+  .result-table-wrap{max-height:60vh;-webkit-overflow-scrolling:touch}
+  .result-table{min-width:860px}
+  .data-table{min-width:560px}
+  .url-cell{max-width:160px}
   .note{font-size:11px}
+  .field{flex:1 1 140px}
+  .field-row .field[style*="flex:0 1 160px"],
+  .field-row .field[style*="flex:1 1 280px"],
+  .field-row .field[style*="flex:0 0 auto"]{flex:1 1 100%!important}
+}
+/* 手机 */
+@media(max-width:640px){
+  body{font-size:15px;-webkit-text-size-adjust:100%}
+  main{
+    padding:12px 10px calc(24px + env(safe-area-inset-bottom,0px));
+    padding-left:max(10px,env(safe-area-inset-left,0px));
+    padding-right:max(10px,env(safe-area-inset-right,0px));
+  }
+  .page-header{margin-bottom:12px;gap:8px}
+  .page-header h1{font-size:1.2rem}
+  .page-header .sub{font-size:11px}
+  .section{margin-bottom:16px}
+  .section-title{font-size:12px;margin-bottom:8px}
+  .card{padding:12px 12px;border-radius:10px}
+  .card h2{font-size:1rem;margin-bottom:10px}
+  .card h3{font-size:.88rem}
+  .card-stack{gap:10px}
+  .grid-2,.grid-import{gap:10px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .stat{padding:10px}
+  .stat b{font-size:18px}
+  /* 触控友好：避免 iOS 聚焦缩放 */
+  input,select,button{
+    padding:11px 12px;
+    font-size:16px;
+    max-width:100%;
+  }
+  button.sm{padding:8px 10px;font-size:13px}
+  input[type=number]{width:72px}
+  input[type=url],input[type=text],input[type=file],select{width:100%;min-width:0}
+  .row{gap:8px}
+  .row > button,.row > .secondary{flex:1 1 auto;min-height:44px}
+  .field-row{gap:10px 12px}
+  .field{flex:1 1 100%}
+  .field select,.field input[type=text],.field input[type=url]{width:100%}
+  .field-inline{width:100%}
+  .field-inline input[type=number]{flex:0 0 auto}
+  .field-inline button{flex:1 1 auto;min-height:44px}
+  /* 表格：横向滑动 + 提示 */
+  .result-table-wrap{
+    margin-left:-2px;margin-right:-2px;
+    max-height:55vh;
+    border-radius:8px;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-x:contain;
+  }
+  .result-table-wrap::before{
+    content:"← 左右滑动查看更多 →";
+    display:block;
+    text-align:center;
+    font-size:11px;
+    color:var(--muted);
+    padding:4px 0 2px;
+    background:#f8fafc;
+    border-bottom:1px solid var(--border);
+  }
+  .result-table,.data-table{font-size:13px}
+  .result-table{min-width:720px}
+  .data-table{min-width:480px}
+  .result-table th,.result-table td,
+  .data-table th,.data-table td{padding:8px 6px}
+  .url-cell{max-width:120px;font-size:11px}
+  .remote-table .col-ops{width:96px}
+  .btn-stack{gap:4px}
+  .btn-stack button{min-height:36px}
+  .legend{gap:6px;margin:6px 0 8px}
+  .legend span{font-size:11px}
+  .note{padding:8px 10px;font-size:11px;line-height:1.55}
+  .hint{font-size:11px}
+  .status-line{font-size:11px;padding:8px;word-break:break-word}
+  .badge,.metric-pill,.score-pill{font-size:11px;padding:2px 6px}
+  .aux-details>summary{padding:12px 14px;font-size:1rem}
+  .aux-body{padding:0 12px 12px}
+  #netResult{font-size:11px;padding:10px}
+  .footer{padding:6px 8px 20px;font-size:11px}
+  .deploy-hint{font-size:10px;padding:0 4px}
+  /* 频道筛选行：按钮换行全宽 */
+  .card .row input#chQuery{flex:1 1 100%;min-width:0}
+}
+/* 窄屏手机 */
+@media(max-width:380px){
+  .stats{grid-template-columns:1fr 1fr}
+  .stat b{font-size:16px}
+  .page-header h1{font-size:1.1rem}
+  .result-table{min-width:640px}
+  .data-table{min-width:420px}
 }
 
 </style>
