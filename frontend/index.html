@@ -415,7 +415,9 @@ button.sm{padding:6px 10px;font-size:12px}
       <div class="row">
         <label>最低评分 <input id="minScore" type="number" value="70" min="0" max="100" style="width:80px"></label>
         <label>最低分辨率 <input id="minHeight" type="number" value="0" min="0" style="width:80px"></label>
-        <button onclick="updateSubs()">更新</button>
+        <button type="button" class="secondary" onclick="updateSubs()">更新</button>
+        <button type="button" onclick="downloadSub('m3u')">保存 M3U</button>
+        <button type="button" class="secondary" onclick="downloadSub('json')">保存 JSON</button>
       </div>
       <div id="subs"></div>
     </div>
@@ -776,38 +778,57 @@ function subscriptionFileName(ext, score, height) {
   return parts.join('-') + '.' + ext;
 }
 
-async function updateSubs() {
+function subQueryParams() {
   const scoreEl = document.getElementById('minScore');
   const heightEl = document.getElementById('minHeight');
+  const score = scoreEl ? (scoreEl.value || 0) : 0;
+  const h = heightEl ? (heightEl.value || 0) : 0;
+  return {
+    score,
+    h,
+    q: `min_score=${encodeURIComponent(score)}&min_height=${encodeURIComponent(h)}`,
+  };
+}
+
+/** 仅刷新统计与订阅地址，不触发文件下载。 */
+async function updateSubs() {
   const subsEl = document.getElementById('subs');
   if (!subsEl) return;
-  let score = scoreEl ? (scoreEl.value || 0) : 0;
-  let h = heightEl ? (heightEl.value || 0) : 0;
-  const q = `min_score=${encodeURIComponent(score)}&min_height=${encodeURIComponent(h)}`;
-  let m = `${base}/api/subscription/m3u?${q}`;
-  let j = `${base}/api/subscription/json?${q}`;
-  let mDl = `${m}&download=1`, jDl = `${j}&download=1`;
-  const mName = subscriptionFileName('m3u', score, h);
-  const jName = subscriptionFileName('json', score, h);
+  const { score, h, q } = subQueryParams();
+  const m = `${base}/api/subscription/m3u?${q}`;
+  const j = `${base}/api/subscription/json?${q}`;
   let count = '正在统计合格源…';
+  subsEl.innerHTML = `<div class="sub muted"><b>${count}</b></div>`;
   try {
     let d = await req(j, { cache: 'no-store' });
     count = `当前合格：${d.channel_count || 0} 个频道，${d.source_count || 0} 个源`;
   } catch (e) {
     count = '订阅统计读取失败：' + e.message;
   }
+  const mName = subscriptionFileName('m3u', score, h);
+  const jName = subscriptionFileName('json', score, h);
   subsEl.innerHTML = `
     <div class="sub ok"><b>${count}</b></div>
-    <div class="sub"><b>M3U 订阅地址：</b><a href="${m}" target="_blank">${m}</a></div>
-    <div class="sub"><b>JSON 订阅地址：</b><a href="${j}" target="_blank">${j}</a></div>
-    <div class="sub row" style="gap:8px;margin-top:6px">
-      <a class="sub" style="padding:0" href="${mDl}" download="${mName}">
-        <button type="button">保存 M3U（${mName}）</button>
-      </a>
-      <a class="sub" style="padding:0" href="${jDl}" download="${jName}">
-        <button type="button" class="secondary">保存 JSON（${jName}）</button>
-      </a>
-    </div>`;
+    <div class="sub"><b>M3U 订阅地址：</b><a href="${m}" target="_blank" rel="noopener">${m}</a></div>
+    <div class="sub"><b>JSON 订阅地址：</b><a href="${j}" target="_blank" rel="noopener">${j}</a></div>
+    <div class="sub muted" style="margin-top:4px">保存文件名示例：${mName} / ${jName}（点上方「保存」按钮下载）</div>`;
+}
+
+/** 仅在用户点击「保存」时下载。 */
+function downloadSub(kind) {
+  const { score, h, q } = subQueryParams();
+  const ext = kind === 'json' ? 'json' : 'm3u';
+  const path = ext === 'json' ? '/api/subscription/json' : '/api/subscription/m3u';
+  const url = `${base}${path}?${q}&download=1`;
+  const name = subscriptionFileName(ext, score, h);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 async function loadRemotePlaylists() {
