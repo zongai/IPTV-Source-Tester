@@ -9,8 +9,13 @@ from app.api.auth import require_admin
 from app.api.websocket import broadcast
 from app.database.database import SessionLocal
 from app.database.locks import db_write_lock
-from app.database.models import SourceDB, TestResultDB
-from app.database.repository import maybe_auto_delete_failed_source, retain_ffprobe_media_fields
+from app.core.config import get_settings
+from app.database.models import SchedulerConfigDB, SourceDB, TestResultDB
+from app.database.repository import (
+    filter_sources_min_interval,
+    maybe_auto_delete_failed_source,
+    retain_ffprobe_media_fields,
+)
 from app.services.test_service import TestRunner
 
 router = APIRouter()
@@ -35,6 +40,17 @@ async def run_job(job_id, deep=True, source_ids=None, mode=None):
         if source_ids:
             q = q.where(SourceDB.id.in_(source_ids))
         sources = list(session.scalars(q))
+        # Respect global/scheduler min interval: skip recently tested sources.
+        # Explicit single-source retests (one id) are not skipped.
+        min_interval = 0
+        cfg = session.get(SchedulerConfigDB, 1)
+        if cfg is not None:
+            min_interval = int(getattr(cfg, 'min_test_interval_minutes', 0) or 0)
+        if min_interval <= 0:
+            min_interval = int(get_settings().min_test_interval_minutes or 0)
+        if not source_ids or len(source_ids) != 1:
+            sources, skipped_recent = filter_sources_min_interval(session, sources, min_interval)
+            jobs[job_id]['skipped_recent'] = skipped_recent
         session.close()
         session = None
         jobs[job_id]['total'] = len(sources)

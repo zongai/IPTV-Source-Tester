@@ -6,7 +6,11 @@ from app.core.config import get_settings
 from app.database.database import SessionLocal
 from app.database.locks import db_write_lock
 from app.database.models import SourceDB, TestResultDB, SchedulerConfigDB, SchedulerRunDB, RemotePlaylistDB
-from app.database.repository import maybe_auto_delete_failed_source, retain_ffprobe_media_fields
+from app.database.repository import (
+    filter_sources_min_interval,
+    maybe_auto_delete_failed_source,
+    retain_ffprobe_media_fields,
+)
 from app.services.remote_playlist_service import fetch_remote_playlist
 from app.services.test_service import TestRunner
 from app.utils.timeutil import app_timezone
@@ -32,6 +36,7 @@ class SchedulerService:
             'segment_test_count': 'INTEGER DEFAULT 2',
             'full_enabled': 'INTEGER DEFAULT 0',
             'full_interval_hours': 'INTEGER DEFAULT 24',
+            'min_test_interval_minutes': 'INTEGER DEFAULT 30',
         }
         for name, definition in additions.items():
             if name not in cols:
@@ -54,6 +59,7 @@ class SchedulerService:
                 segment_test_count=max(1, min(s.segment_test_count, 2)),
                 full_enabled=bool(s.full_test_enabled),
                 full_interval_hours=max(1, int(s.full_test_interval_hours)),
+                min_test_interval_minutes=max(0, int(s.min_test_interval_minutes)),
             )
             session.add(cfg)
             session.commit()
@@ -229,6 +235,8 @@ class SchedulerService:
             connect_timeout = cfg.connect_timeout
             read_timeout = cfg.read_timeout
             segment_test_count = cfg.segment_test_count
+            min_interval = int(getattr(cfg, 'min_test_interval_minutes', 0) or 0)
+            sources, skipped_recent = filter_sources_min_interval(session, sources, min_interval)
             run_scope = scope
 
         with SessionLocal() as session:
@@ -355,6 +363,7 @@ class SchedulerService:
                 'max_concurrency': cfg.max_concurrency, 'max_host_concurrency': cfg.max_host_concurrency,
                 'connect_timeout': cfg.connect_timeout, 'read_timeout': cfg.read_timeout,
                 'segment_test_count': cfg.segment_test_count,
+                'min_test_interval_minutes': int(getattr(cfg, 'min_test_interval_minutes', 30) or 0),
                 'full_enabled': bool(getattr(cfg, 'full_enabled', False)),
                 'full_interval_hours': int(getattr(cfg, 'full_interval_hours', 24) or 24),
                 'last_started_at': cfg.last_started_at,

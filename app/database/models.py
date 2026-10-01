@@ -86,6 +86,8 @@ class SchedulerConfigDB(Base):
     connect_timeout: Mapped[int] = mapped_column(Integer, default=5)
     read_timeout: Mapped[int] = mapped_column(Integer, default=10)
     segment_test_count: Mapped[int] = mapped_column(Integer, default=2)
+    # Skip source when last test is within this many minutes (0 disables).
+    min_test_interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
     # Separate low-frequency full (FFprobe) schedule.
     full_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     full_interval_hours: Mapped[int] = mapped_column(Integer, default=24)

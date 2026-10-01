@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # 1–2 segments for liveness; raise for finer speed samples.
     segment_test_count: int = Field(2, ge=1)
     test_interval_minutes: int = Field(30, ge=1)
+    # Skip a source if its last test is newer than this many minutes (0 = off).
+    min_test_interval_minutes: int = Field(30, ge=0, le=10080)
     # Periodic full (FFprobe) profile — independent of standard interval.
     full_test_enabled: bool = False
     full_test_interval_hours: int = Field(24, ge=1, le=168)

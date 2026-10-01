@@ -447,6 +447,16 @@ button.sm{padding:6px 10px;font-size:12px}
             </div>
             <p class="hint">日常定时默认「标准 + 仅超时未测」；完整模式单独低频调度，降低对源站压力。</p>
 
+            
+              <div class="field">
+                <span class="field-label">同源最小测试间隔</span>
+                <div class="field-inline">
+                  <input id="schMinInterval" type="number" min="0" max="10080" value="30">
+                  <span class="muted">分钟（0=不限制）</span>
+                </div>
+              </div>
+              <p class="hint">距同一源上次测试不足该时间则跳过，避免重复压测源站。</p>
+
             <button onclick="saveScheduler()">保存设置</button>
             <button class="secondary" onclick="runScheduler()">立即执行</button>
           </div>
@@ -1116,6 +1126,7 @@ async function loadScheduler() {
     setVal('schInterval', d.interval_minutes || 30);
     setVal('schScope', d.source_scope || 'enabled');
     setVal('schStale', d.stale_hours || 24);
+    setVal('schMinInterval', d.min_test_interval_minutes ?? 30);
     setVal('schConcurrency', d.max_concurrency || 20);
     setVal('schHostConcurrency', d.max_host_concurrency || 5);
     setVal('schConnectTimeout', d.connect_timeout || 5);
@@ -1140,6 +1151,7 @@ async function saveScheduler() {
         interval_minutes: Number(v('schInterval', 30)),
         source_scope: v('schScope', 'enabled'),
         stale_hours: Number(v('schStale', 24)),
+        min_test_interval_minutes: Number(v('schMinInterval', 30)),
         max_concurrency: Number(v('schConcurrency', 20)),
         max_host_concurrency: Number(v('schHostConcurrency', 5)),
         connect_timeout: Number(v('schConnectTimeout', 5)),

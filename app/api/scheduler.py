@@ -18,6 +18,7 @@ class SchedulerUpdate(BaseModel):
     connect_timeout: int | None = Field(default=None, ge=1, le=120)
     read_timeout: int | None = Field(default=None, ge=1, le=300)
     segment_test_count: int | None = Field(default=None, ge=1, le=10)
+    min_test_interval_minutes: int | None = Field(default=None, ge=0, le=10080)
     full_enabled: bool | None = None
     full_interval_hours: int | None = Field(default=None, ge=1, le=168)
 

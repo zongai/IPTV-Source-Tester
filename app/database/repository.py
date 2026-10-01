@@ -242,3 +242,27 @@ def purge_failed_sources(session: Session) -> dict:
         "deleted_channels": channels_removed,
         "source_ids": [x["source_id"] for x in deleted],
     }
+
+
+def filter_sources_min_interval(session: Session, sources: list, min_interval_minutes: int) -> tuple[list, int]:
+    """Drop sources tested more recently than min_interval_minutes.
+
+    Returns (kept_sources, skipped_count). Interval <= 0 disables filtering.
+    """
+    if not sources or not min_interval_minutes or min_interval_minutes <= 0:
+        return list(sources), 0
+    cutoff = datetime.utcnow() - timedelta(minutes=int(min_interval_minutes))
+    kept = []
+    skipped = 0
+    for src in sources:
+        latest = session.scalar(
+            select(TestResultDB.tested_at)
+            .where(TestResultDB.source_id == src.id)
+            .order_by(TestResultDB.tested_at.desc())
+            .limit(1)
+        )
+        if latest is not None and latest >= cutoff:
+            skipped += 1
+            continue
+        kept.append(src)
+    return kept, skipped
