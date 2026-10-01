@@ -13,9 +13,9 @@ def test_normalize_url():
 
 
 def test_channel_normalization():
-    assert normalize_channel_name("中央电视台1") == "CCTV-1"
-    assert normalize_channel_name("CCTV 1") == "CCTV-1"
-    assert normalize_channel_name("CCTV5+") == "CCTV-5+"
+    assert normalize_channel_name("中央电视台1") == "CCTV1"
+    assert normalize_channel_name("CCTV 1") == "CCTV1"
+    assert normalize_channel_name("CCTV5+") == "CCTV5+"
 
 
 def test_normalize_url_preserves_encoded_query():

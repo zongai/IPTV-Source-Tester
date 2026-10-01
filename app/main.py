@@ -23,7 +23,7 @@ from app.database.database import SessionLocal
 from app.database.init_db import init_db
 from app.database.locks import db_write_lock
 from app.database.maintenance import cleanup_old_test_results
-from app.services.import_service import dedupe_sources
+from app.services.import_service import dedupe_sources, refresh_epg_names
 
 scheduler = scheduler_api.scheduler_service
 
@@ -42,6 +42,15 @@ async def lifespan(app):
             with SessionLocal() as session:
                 removed = dedupe_sources(session)
                 if removed:
+                    session.commit()
+    except Exception:
+        pass
+    # Align display names with EPG channel ids (tvg-id matching).
+    try:
+        async with db_write_lock:
+            with SessionLocal() as session:
+                n = refresh_epg_names(session)
+                if n:
                     session.commit()
     except Exception:
         pass

@@ -23,7 +23,7 @@ def test_cctv1_variants_same_key():
     for v in variants:
         ident = resolve_channel(display_name=v)
         assert ident.group == GROUP_CCTV
-        assert ident.display_name == "CCTV-1 综合"
+        assert ident.display_name == "CCTV1"
 
 
 def test_cctv10_not_merged_with_cctv1():

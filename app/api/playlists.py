@@ -156,8 +156,10 @@ def _m3u_response(
             if source.get('authorization'):
                 headers['Authorization'] = source['authorization']
             group_title = c.get('group') or rule_group_for_key(c.get('id') or '', c.get('name')) or ''
-            entries.append({'name': c['name'], 'url': source['url'], 'attrs': {
-                'tvg-id': c['id'], 'tvg-name': c['name'], 'tvg-logo': c['logo'],
+            # tvg-id / tvg-name must match EPG channel id (e.g. CCTV1), not internal key.
+            epg_name = c.get('name') or c.get('id') or ''
+            entries.append({'name': epg_name, 'url': source['url'], 'attrs': {
+                'tvg-id': epg_name, 'tvg-name': epg_name, 'tvg-logo': c['logo'],
                 'group-title': group_title,
             }, 'headers': headers})
     # Group (央视/卫视/其他) then CCTV numeric order — not lexicographic name.

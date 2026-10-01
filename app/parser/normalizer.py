@@ -57,14 +57,16 @@ def normalize_channel_name(name: str) -> str:
     from app.matcher.channel_matcher import resolve_channel
 
     ident = resolve_channel(display_name=name)
-    # Keep uppercase CCTV-N style for older tests/callers.
+    # Prefer EPG-aligned display (CCTV1 / CCTV5+ / 湖南卫视).
+    if ident.display_name:
+        return ident.display_name
     m = __import__("re").fullmatch(r"cctv-(\d+)(-plus)?", ident.key)
     if m:
-        base = f"CCTV-{m.group(1)}"
+        base = f"CCTV{m.group(1)}"
         return base + ("+" if m.group(2) else "")
     if ident.key == "cctv-4k":
-        return "CCTV-4K"
-    return (ident.display_name or name or "").upper()
+        return "CCTV4K"
+    return (name or "").upper()
 
 
 def infer_default_group(*names: str | None) -> str | None:

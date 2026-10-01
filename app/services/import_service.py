@@ -114,6 +114,49 @@ def dedupe_sources(session) -> int:
     return deleted
 
 
+def refresh_epg_names(session) -> int:
+    """Re-apply EPG-aligned display names and rule groups on existing channels.
+
+    Internal channel ids (keys) stay stable; only display_name / group_name update
+    so exported tvg-id matches https://epg.zsdc.eu.org/t.xml.gz.
+    """
+    updated = 0
+    for ch in session.scalars(select(ChannelDB)).all():
+        ident = resolve_channel(
+            tvg_id=ch.tvg_id,
+            tvg_name=ch.display_name,
+            display_name=ch.display_name,
+        )
+        # Prefer resolving from current display; if key is cctv-*, force dict name.
+        if ch.id and str(ch.id).startswith("cctv"):
+            ident = resolve_channel(display_name=ch.display_name or ch.id)
+            # Re-resolve from canonical key when display is messy
+            from app.matcher.channel_matcher import CCTV_DISPLAY
+
+            if ch.id in CCTV_DISPLAY:
+                new_name = CCTV_DISPLAY[ch.id]
+                new_group = ident.group
+            else:
+                new_name = ident.display_name
+                new_group = ident.group
+        else:
+            new_name = ident.display_name
+            new_group = ident.group
+        changed = False
+        if new_name and ch.display_name != new_name:
+            ch.display_name = new_name
+            changed = True
+        if new_group and ch.group_name != new_group:
+            ch.group_name = new_group
+            changed = True
+        if changed:
+            updated += 1
+    if updated:
+        session.flush()
+        logger.info("refresh_epg_names updated %s channels", updated)
+    return updated
+
+
 def import_entries(session, entries, playlist_name=None):
     added = skipped = relinked = 0
     # Identity index must treat DB NULL headers and missing import headers as equal.
