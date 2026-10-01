@@ -72,19 +72,28 @@ button.sm{padding:6px 10px;font-size:12px}
 .url-cell{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#374151;cursor:default}
 .url-cell:hover{color:var(--accent)}
 .remote-table{table-layout:fixed;min-width:0;width:100%}
-.remote-table .col-name{width:88px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.remote-table th,.remote-table td{vertical-align:middle}
+.remote-table .col-name{width:72px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .remote-table .col-url{width:auto}
-.remote-table .col-switch{width:56px;text-align:center;white-space:nowrap}
-.remote-table .col-interval{width:88px;white-space:nowrap}
-.remote-table .col-fetched{width:128px;white-space:nowrap;font-size:12px}
-.remote-table .col-result{width:72px;white-space:nowrap}
-.remote-table .col-stat{width:110px;white-space:nowrap;font-size:12px}
-.remote-table .col-ops{width:168px}
-.btn-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.btn-row button{width:auto}
+.remote-table .col-switch{width:64px;text-align:center;white-space:nowrap}
+.remote-table .col-interval{width:72px;white-space:nowrap;text-align:center}
+.remote-table .col-fetched{width:136px;white-space:nowrap;font-size:12px;color:#4b5563}
+.remote-table .col-result{width:80px;text-align:center;white-space:nowrap}
+.remote-table .col-stat{width:108px;white-space:nowrap;font-size:12px;color:#4b5563}
+.remote-table .col-ops{width:200px}
+.btn-row{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;justify-content:flex-end}
+.btn-row button{width:auto;flex:0 0 auto}
+.btn-row button.sm{padding:5px 10px;font-size:12px;line-height:1.2}
+.btn-danger{background:#fff;color:var(--bad);border-color:#fecaca}
+.btn-danger:hover{background:#fef2f2;filter:none}
+.pill-on{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--ok-bg);color:var(--ok)}
+.pill-off{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:#e5e7eb;color:#4b5563}
 .sch-table .col-id{width:56px}
 .sch-table td{font-size:13px}
 #remoteMsg{min-height:1.4em;margin:8px 0 0}
+.remote-form .field-name{flex:0 1 140px}
+.remote-form .field-url{flex:1 1 260px}
+.remote-form .field-interval{flex:0 0 auto}
 .sub{display:block;padding:7px 0;word-break:break-all}
 .progress{height:8px;background:#e5e7eb;border-radius:10px;overflow:hidden;margin-top:8px}
 .progress>i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s ease}
@@ -129,9 +138,9 @@ button.sm{padding:6px 10px;font-size:12px}
   .url-cell{max-width:160px}
   .note{font-size:11px}
   .field{flex:1 1 140px}
-  .field-row .field[style*="flex:0 1 160px"],
-  .field-row .field[style*="flex:1 1 280px"],
-  .field-row .field[style*="flex:0 0 auto"]{flex:1 1 100%!important}
+  .remote-form .field-name,
+  .remote-form .field-url,
+  .remote-form .field-interval{flex:1 1 100%}
 }
 /* 手机 */
 @media(max-width:640px){
@@ -195,16 +204,16 @@ button.sm{padding:6px 10px;font-size:12px}
   .result-table th,.result-table td,
   .data-table th,.data-table td{padding:8px 6px}
   .url-cell{font-size:11px}
-  .remote-table{min-width:640px}
-  .remote-table .col-name{width:64px}
-  .remote-table .col-switch{width:48px}
-  .remote-table .col-interval{width:72px}
-  .remote-table .col-fetched{width:100px}
-  .remote-table .col-result{width:56px}
+  .remote-table{min-width:700px}
+  .remote-table .col-name{width:56px}
+  .remote-table .col-switch{width:56px}
+  .remote-table .col-interval{width:64px}
+  .remote-table .col-fetched{width:110px}
+  .remote-table .col-result{width:64px}
   .remote-table .col-stat{width:96px}
-  .remote-table .col-ops{width:148px}
+  .remote-table .col-ops{width:180px}
   .btn-row{gap:4px}
-  .btn-row button{min-height:36px}
+  .btn-row button.sm{min-height:34px;padding:6px 8px}
   .legend{gap:6px;margin:6px 0 8px}
   .legend span{font-size:11px}
   .note{padding:8px 10px;font-size:11px;line-height:1.55}
@@ -273,26 +282,29 @@ button.sm{padding:6px 10px;font-size:12px}
       </div>
       <div class="card">
         <h2>远程 M3U 自动获取</h2>
-        <div class="field-row">
-          <div class="field" style="flex:0 1 160px">
+        <div class="field-row remote-form">
+          <div class="field field-name">
             <span class="field-label">名称</span>
-            <input id="remoteName" type="text" placeholder="例如：主订阅" style="min-width:120px;width:100%">
+            <input id="remoteName" type="text" placeholder="例如：主订阅" style="min-width:0;width:100%">
           </div>
-          <div class="field" style="flex:1 1 280px">
+          <div class="field field-url">
             <span class="field-label">订阅地址</span>
-            <input id="remoteUrl" type="url" placeholder="https://example.com/playlist.m3u" style="width:100%">
+            <input id="remoteUrl" type="url" placeholder="https://example.com/playlist.m3u" style="min-width:0;width:100%">
           </div>
-          <div class="field" style="flex:0 0 auto">
+          <div class="field field-interval">
             <span class="field-label">获取间隔</span>
             <div class="field-inline">
               <input id="remoteInterval" type="number" min="1" max="10080" value="360">
               <span class="muted">分钟</span>
-              <button onclick="addRemote()">添加</button>
+              <button type="button" onclick="addRemote()">添加</button>
             </div>
           </div>
         </div>
-        <p class="hint">按各自间隔自动拉取并导入；相同地址不会重复添加。永久失效（如 401/403/404）会立即删除订阅配置；临时错误连续失败 3 次后删除。仅删除订阅配置，不影响已导入的频道和源。</p>
-        <p id="remoteMsg" class="muted" style="margin:8px 0 0"></p>
+        <details class="note-details" style="margin-top:8px">
+          <summary>规则说明</summary>
+          <p class="hint" style="margin-top:6px">按各自间隔自动拉取并导入；相同地址不会重复添加。永久失效（如 401/403/404）会立即删除订阅配置；临时错误连续失败 3 次后删除。仅删除订阅配置，不影响已导入的频道和源。</p>
+        </details>
+        <p id="remoteMsg" class="muted"></p>
         <div id="remotePlaylists" class="muted">加载中…</div>
       </div>
     </div>
@@ -565,8 +577,17 @@ function msg(id, s, good = true, opts = {}) {
 function shortUrl(u) {
   if (!u) return '';
   const s = String(u);
-  if (s.length <= 56) return s;
-  return s.slice(0, 28) + '…' + s.slice(-20);
+  if (s.length <= 64) return s;
+  try {
+    const x = new URL(s);
+    const parts = x.pathname.split('/').filter(Boolean);
+    const tail = parts.slice(-2).join('/') || '';
+    const host = x.host;
+    if (tail) return host + '/…/' + tail;
+    return host + (x.pathname.length > 1 ? '/…' : '');
+  } catch {
+    return s.slice(0, 30) + '…' + s.slice(-24);
+  }
 }
 
 async function importUrl() {
@@ -857,20 +878,28 @@ async function loadRemotePlaylists() {
       if (x.last_status === 'failed' && fail)
         status += `（连续失败 ${fail}/${x.auto_delete_after_failures || 3}）`;
       const url = x.url || '';
-      const resultText = escapeHtml(status) + (x.last_error ? '：' + escapeHtml(x.last_error) : '');
+      const resultText = status + (x.last_error ? '：' + x.last_error : '');
+      const resultBadge = x.last_status === 'success'
+        ? '<span class="badge badge-ok">成功</span>'
+        : x.last_status === 'failed'
+          ? '<span class="badge badge-fail">失败</span>'
+          : '<span class="badge badge-pending">未获取</span>';
+      const switchPill = x.enabled
+        ? '<span class="pill-on">启用</span>'
+        : '<span class="pill-off">停用</span>';
       return `<tr>
         <td class="col-name" title="${escapeHtml(x.name)}">${escapeHtml(x.name)}</td>
         <td class="col-url"><span class="url-cell" title="${escapeHtml(url)}">${escapeHtml(shortUrl(url))}</span></td>
-        <td class="col-switch">${x.enabled ? '启用' : '停用'}</td>
+        <td class="col-switch">${switchPill}</td>
         <td class="col-interval">${x.interval_minutes} 分</td>
         <td class="col-fetched">${x.last_fetched_at ? fmtTime(x.last_fetched_at) : '从未获取'}</td>
-        <td class="col-result" title="${resultText}">${escapeHtml(status)}</td>
+        <td class="col-result" title="${escapeHtml(resultText)}">${resultBadge}</td>
         <td class="col-stat">+${x.last_added || 0} / 跳过 ${x.last_skipped || 0}</td>
         <td class="col-ops">
           <div class="btn-row">
-            <button class="sm" onclick="fetchRemote(${x.id})">获取</button>
-            <button class="secondary sm" onclick="toggleRemote(${x.id}, ${!x.enabled})">${x.enabled ? '停用' : '启用'}</button>
-            <button class="secondary sm" onclick="deleteRemote(${x.id})">删除</button>
+            <button type="button" class="sm" onclick="fetchRemote(${x.id})">获取</button>
+            <button type="button" class="secondary sm" onclick="toggleRemote(${x.id}, ${!x.enabled})">${x.enabled ? '停用' : '启用'}</button>
+            <button type="button" class="btn-danger sm" onclick="deleteRemote(${x.id})">删除</button>
           </div>
         </td>
       </tr>`;
