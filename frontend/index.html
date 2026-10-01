@@ -519,15 +519,23 @@ async function req(url, opt = {}) {
   return d;
 }
 const _msgTimers = {};
-function msg(id, s, good = true) {
+function msg(id, s, good = true, opts = {}) {
   const e = el(id);
   if (!e) return;
-  e.textContent = s;
+  e.textContent = s == null ? '' : String(s);
+  if (!e.textContent) {
+    e.className = 'muted';
+    if (_msgTimers[id]) { clearTimeout(_msgTimers[id]); delete _msgTimers[id]; }
+    return;
+  }
   e.className = good ? 'ok' : 'bad';
   if (_msgTimers[id]) clearTimeout(_msgTimers[id]);
-  if (s && good) {
+  // 进行中提示不自动清空；成功/失败默认约 6 秒后清除
+  const sticky = opts.sticky || /^(正在|检测中)/.test(e.textContent);
+  if (!sticky) {
     _msgTimers[id] = setTimeout(() => {
       if (e.textContent === s) { e.textContent = ''; e.className = 'muted'; }
+      delete _msgTimers[id];
     }, 6000);
   }
 }
@@ -596,8 +604,7 @@ async function startTest() {
   try {
     let mode = document.getElementById('manualMode').value;
     let d = await req('/api/tests/start?mode=' + encodeURIComponent(mode), { method: 'POST' });
-    document.getElementById('testMsg').textContent =
-      `已启动${labelMap(MODE_LABEL, mode)}测试（任务 ${d.id}）`;
+    msg('testMsg', `已启动${labelMap(MODE_LABEL, mode)}测试（任务 ${d.id}）`, true, { sticky: true });
     poll(d.id);
   } catch (e) { msg('testMsg', e.message, false); }
 }
@@ -607,11 +614,11 @@ async function poll(id) {
     let p = d.total ? Math.round(d.progress / d.total * 100) : 0;
     document.getElementById('bar').style.width = p + '%';
     let st = labelMap(JOB_STATUS, d.status, d.status);
-    document.getElementById('testMsg').textContent =
-      `${st}：已测 ${d.progress || 0} / 共 ${d.total || 0}（${p}%）`;
+    const line = `${st}：已测 ${d.progress || 0} / 共 ${d.total || 0}（${p}%）`;
+    const done = ['completed', 'failed', 'stop_requested'].includes(d.status);
+    msg('testMsg', line, d.status !== 'failed', done ? {} : { sticky: true });
     await Promise.all([loadChannels(false), loadStats(), updateSubs()]);
-    if (!['completed', 'failed', 'stop_requested'].includes(d.status))
-      setTimeout(() => poll(id), 1500);
+    if (!done) setTimeout(() => poll(id), 1500);
   } catch (e) { msg('testMsg', e.message, false); }
 }
 
