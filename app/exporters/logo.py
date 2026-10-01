@@ -1,8 +1,8 @@
-"""Resolve channel logos from https://github.com/vircloud/TVLogo.
+"""Resolve channel logos against https://github.com/vircloud/TVLogo.
 
-Broken upstream logos often look like:
-  https://gcore.jsdelivr.net/gh/taksssss/tv/icon/.png
-(empty filename). We rewrite those to vircloud/TVLogo CDN URLs.
+Only emit CDN URLs for files that exist in the repo catalog
+(``tvlogo_catalog.TVLOGO_FILES``). Broken or suspect upstream logos are
+replaced; unknown channels without a catalog hit keep a non-broken URL or None.
 """
 
 from __future__ import annotations
@@ -10,30 +10,51 @@ from __future__ import annotations
 import re
 from urllib.parse import quote, unquote, urlparse
 
-# jsDelivr CDN for the vircloud/TVLogo repo (root-level PNG files).
+from app.exporters.tvlogo_catalog import TVLOGO_FILES
+
+# jsDelivr CDN for root-level PNGs in vircloud/TVLogo.
 TVLOGO_CDN_BASE = "https://cdn.jsdelivr.net/gh/vircloud/TVLogo@main"
 
-_QUALITY_SUFFIX_RE = re.compile(
-    r"[\s_\-]*(?:HD|SD|FHD|UHD|4K|8K|高清|超清|超高清|标清|频道)$",
+# Hosts / path patterns that frequently serve empty or wrong icons.
+_SUSPECT_LOGO_MARKERS = (
+    "taksssss",
+    "/tv/icon/",
+    "/icon/.png",
+    "/png/.png",
+    "placeholder",
+    "default-logo",
+    "no-logo",
+    "null.png",
+    "undefined.png",
+)
+
+_QUALITY_TAIL = re.compile(
+    r"[\s_\-]*(?:HD|SD|FHD|UHD|4K|8K|50FPS|60FPS|高清|超清|超高清|标清|蓝光|频道)$",
     re.IGNORECASE,
 )
-# Allow optional program suffix (综合/科教/...) after the number.
-_CCTV_RE = re.compile(
+# CCTV-N / CCTV-N+ with optional Chinese program suffix.
+_CCTV_FULL = re.compile(
     r"^CCTV[\s\-_]*(\d+)(?:[\s\-_]*(\+|plus))?(?:[\s\-_].*)?$",
     re.IGNORECASE,
 )
-_CCTV_SLUG_RE = re.compile(
-    r"^cctv[\s\-_]*(\d+)(?:[\s\-_]*(plus))?(?:[\s\-_].*)?$",
+_CCTV_KEY = re.compile(r"^cctv-(\d+)(?:-(plus))?$", re.IGNORECASE)
+# Common program labels after CCTV number (dictionary display names).
+_CCTV_PROG = re.compile(
+    r"^(CCTV[\s\-_]*\d+(?:[\s\-_]*(?:\+|plus))?)[\s\-_]*"
+    r"(?:综合|财经|综艺|中文国际|体育|电影|国防军事|电视剧|纪录|科教|"
+    r"戏曲|社会与法|新闻|少儿|音乐|奥林匹克|农业农村).*$",
     re.IGNORECASE,
 )
 
 
 def is_broken_logo(url: str | None) -> bool:
-    """Return True when the logo URL is missing or has an empty/invalid filename."""
+    """True when the logo URL is missing, empty-filename, or clearly invalid."""
     if url is None:
         return True
     text = str(url).strip()
     if not text:
+        return True
+    if not text.lower().startswith(("http://", "https://")):
         return True
     try:
         path = unquote(urlparse(text).path or "")
@@ -49,63 +70,94 @@ def is_broken_logo(url: str | None) -> bool:
     name, sep, ext = base.rpartition(".")
     if sep and ext.lower() in {"png", "jpg", "jpeg", "webp", "gif"} and not name.strip():
         return True
-    # Common bad patterns from scrapers / icon CDNs
-    if "/icon/.png" in text or "/png/.png" in text or text.endswith("/.png"):
+    low = text.lower()
+    if any(m in low for m in ("/icon/.png", "/png/.png", "/.png", "icon/.jpg")):
         return True
     return False
 
 
-def logo_filename_candidates(channel_name: str | None) -> list[str]:
-    """Build ordered PNG filename candidates matching vircloud/TVLogo naming.
+def is_suspect_logo(url: str | None) -> bool:
+    """True for known-bad icon CDNs / placeholders (may still have a filename)."""
+    if is_broken_logo(url):
+        return True
+    text = str(url).strip().lower()
+    return any(m in text for m in _SUSPECT_LOGO_MARKERS)
 
-    Prefer repo-style names first (e.g. CCTV1.png over CCTV-1.png).
-    """
+
+def _strip_quality(name: str) -> str:
+    s = name.strip()
+    prev = None
+    while prev != s:
+        prev = s
+        s = _QUALITY_TAIL.sub("", s).strip()
+    return s
+
+
+def logo_filename_candidates(channel_name: str | None) -> list[str]:
+    """Ordered PNG filenames to try against the TVLogo catalog."""
     raw = (channel_name or "").strip()
     if not raw:
         return []
 
-    preferred: list[str] = []
-    fallback: list[str] = [raw]
-    cleaned = _QUALITY_SUFFIX_RE.sub("", raw).strip()
-    if cleaned and cleaned not in fallback:
-        fallback.append(cleaned)
-    # Drop CCTV program labels so "CCTV-10 科教" → still maps to CCTV10.png
-    prog = re.sub(
-        r"^(CCTV[\s\-_]*\d+(?:[\s\-_]*(?:\+|plus))?)[\s\-_]*(?:综合|财经|综艺|中文国际|体育|电影|国防军事|电视剧|纪录|科教|戏曲|社会与法|新闻|少儿|音乐|奥林匹克|农业农村).*$",
-        r"\1",
-        cleaned or raw,
-        flags=re.IGNORECASE,
-    )
-    if prog and prog not in fallback:
-        fallback.append(prog.strip())
+    seeds: list[str] = []
+    for s in (raw, _strip_quality(raw)):
+        if s and s not in seeds:
+            seeds.append(s)
 
-    def _add_cctv(base: str) -> None:
-        m = _CCTV_RE.match(base) or _CCTV_SLUG_RE.match(base)
+    # Canonical id style: cctv-1 → CCTV1
+    for s in list(seeds):
+        m = _CCTV_KEY.match(s)
         if m:
             cctv = f"CCTV{m.group(1)}"
             if m.group(2):
                 cctv += "+"
-            if cctv not in preferred:
-                preferred.append(cctv)
-        m2 = re.match(r"^cctv-(\d+)(?:-(plus))?$", base, re.IGNORECASE)
-        if m2:
-            cctv = f"CCTV{m2.group(1)}"
-            if m2.group(2):
+            if cctv not in seeds:
+                seeds.insert(0, cctv)
+        m = _CCTV_FULL.match(s)
+        if m:
+            cctv = f"CCTV{m.group(1)}"
+            if m.group(2):
                 cctv += "+"
-            if cctv not in preferred:
-                preferred.append(cctv)
+            if cctv not in seeds:
+                seeds.insert(0, cctv)
+        # Drop program suffix: CCTV-10 科教 → CCTV-10
+        m = _CCTV_PROG.match(s)
+        if m:
+            base = m.group(1)
+            if base not in seeds:
+                seeds.append(base)
+            m2 = _CCTV_FULL.match(base)
+            if m2:
+                cctv = f"CCTV{m2.group(1)}"
+                if m2.group(2):
+                    cctv += "+"
+                if cctv not in seeds:
+                    seeds.insert(0, cctv)
 
-    for base in list(fallback):
-        _add_cctv(base)
-        compact = re.sub(r"[\s_\-]+", "", base)
-        if compact and compact not in fallback:
-            fallback.append(compact)
-            _add_cctv(compact)
+    # Compact form without separators
+    for s in list(seeds):
+        compact = re.sub(r"[\s_\-]+", "", s)
+        if compact and compact not in seeds:
+            seeds.append(compact)
+            m = _CCTV_FULL.match(compact) or re.match(
+                r"^CCTV(\d+)(\+|plus)?$", compact, re.IGNORECASE
+            )
+            if m:
+                cctv = f"CCTV{m.group(1)}"
+                if m.lastindex and m.group(2):
+                    cctv += "+"
+                if cctv not in seeds:
+                    seeds.insert(0, cctv)
 
-    variants = preferred + [v for v in fallback if v not in preferred]
-    seen: set[str] = set()
+    # Special: CCTV4K
+    for s in list(seeds):
+        if re.search(r"CCTV[\s\-_]*4K", s, re.IGNORECASE):
+            if "CCTV4K" not in seeds:
+                seeds.insert(0, "CCTV4K")
+
     out: list[str] = []
-    for v in variants:
+    seen: set[str] = set()
+    for v in seeds:
         v = v.strip()
         if not v:
             continue
@@ -113,12 +165,23 @@ def logo_filename_candidates(channel_name: str | None) -> list[str]:
         if fn not in seen:
             seen.add(fn)
             out.append(fn)
+        # Also try without hyphen variants already covered
     return out
 
 
+def catalog_match(channel_name: str | None) -> str | None:
+    """First candidate filename that exists in vircloud/TVLogo, or None."""
+    for fn in logo_filename_candidates(channel_name):
+        if fn in TVLOGO_FILES:
+            return fn
+        # Case-insensitive fallback (repo uses mixed Chinese + Latin)
+        for real in TVLOGO_FILES:
+            if real.lower() == fn.lower():
+                return real
+    return None
+
+
 def tvlogo_url(filename: str) -> str:
-    """CDN URL for a vircloud/TVLogo file (supports Chinese filenames)."""
-    # Encode path segment but keep characters commonly present in the repo.
     encoded = quote(filename, safe="+")
     return f"{TVLOGO_CDN_BASE}/{encoded}"
 
@@ -129,15 +192,30 @@ def resolve_tvg_logo(
     *,
     force: bool = False,
 ) -> str | None:
-    """Return a usable logo URL.
+    """Return a logo URL verified against the TVLogo catalog when possible.
 
-    - If current_logo is valid and force is False, keep it.
-    - If broken/missing (or force), map channel_name to vircloud/TVLogo CDN.
+    Priority:
+    1. Catalog match for the channel name (always preferred when broken/suspect/force
+       or when current URL is empty).
+    2. Keep a non-broken, non-suspect current_logo if no catalog match.
+    3. None if nothing usable.
     """
-    if not force and not is_broken_logo(current_logo):
+    matched = catalog_match(channel_name)
+
+    needs_fix = force or is_suspect_logo(current_logo)
+    if matched and needs_fix:
+        return tvlogo_url(matched)
+
+    # Even when current looks "valid", prefer catalog for known channels so
+    # players get stable, existing CDN files instead of random dead links.
+    if matched and (is_broken_logo(current_logo) or not current_logo):
+        return tvlogo_url(matched)
+
+    if matched:
+        # Optional: still prefer catalog for consistency (user reported many wrong icons).
+        return tvlogo_url(matched)
+
+    if not is_broken_logo(current_logo) and not is_suspect_logo(current_logo):
         return current_logo
 
-    candidates = logo_filename_candidates(channel_name)
-    if not candidates:
-        return None if is_broken_logo(current_logo) else current_logo
-    return tvlogo_url(candidates[0])
+    return None if is_broken_logo(current_logo) else current_logo

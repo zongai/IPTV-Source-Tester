@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import delete, select
 
 from app.database.models import ChannelDB, SourceDB, TestResultDB
-from app.exporters.logo import is_broken_logo, resolve_tvg_logo
+from app.exporters.logo import is_broken_logo, is_suspect_logo, resolve_tvg_logo
 from app.matcher.channel_matcher import resolve_channel
 from app.parser.normalizer import (
     normalize_header,
@@ -178,7 +178,8 @@ def import_entries(session, entries, playlist_name=None):
             c.group_name = rule_group
             if e.tvg_id:
                 c.tvg_id = e.tvg_id
-            if logo and (not c.tvg_logo or is_broken_logo(c.tvg_logo) or e.tvg_logo):
+            # Always refresh from resolver (catalog-backed); do not keep suspect URLs.
+            if logo and (not c.tvg_logo or is_broken_logo(c.tvg_logo) or is_suspect_logo(c.tvg_logo) or logo != c.tvg_logo):
                 c.tvg_logo = logo
             if e.tvg_language:
                 c.language = e.tvg_language
